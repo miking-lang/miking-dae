@@ -1,4 +1,4 @@
-# DAECORE
+# Miking-DAE
 An Automatic Differentiation based Differential Algebraic Equations (DAE) solver that handles high-index DAEs with stabilization.
 
 ## Installation
