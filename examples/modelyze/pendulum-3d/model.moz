@@ -1,0 +1,22 @@
+include GRAPHSIMVISUAL
+
+def world, f1, f2: Frame
+
+def m = 1.
+def l = 2.
+def h = 0.3
+def D = 5.
+
+def RevoluteJoint = RevoluteJointV world 0.3 0.4 BLUE 1.
+def Bar(l: Real, q0: RealQuaternion) =
+  BarV(world, m, l, 0.3, 0.3, GREEN, 0.7, q0)
+
+def Bar(l: Real) = BarV(world, m, l, 0.3, 0.3, GREEN, 0.7)
+
+def q0_1 = IDQ_R
+def model = {
+	world -- RevoluteJoint(YHAT_R, q0_1) -- Bar(l, q0_1) -- f1
+}
+
+def _ = elaborateToFile "scene.json" (export2ModelicaAliasesFileDebug 1 "model.mo" "Model") model
+def _ = writeFile "model.mc" (export2Daecore (elaborate model) ++ "\n")
