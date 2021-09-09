@@ -124,11 +124,11 @@ let _printResidual = lam s : DaecoreSolverSession.
   let t = s._t in
   s._resf t y yp r;
   printLn "y = ";
-  printLn (tensorToString float2string y);
+  printLn (tensor2string float2string y);
   printLn "yp = ";
-  printLn (tensorToString float2string yp);
+  printLn (tensor2string float2string yp);
   printLn "r = ";
-  printLn (tensorToString float2string r)
+  printLn (tensor2string float2string r)
 
 let daecoreSolverXOffsets : DaecoreSolverSession -> Vector Int =
   lam s. s._ds

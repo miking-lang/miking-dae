@@ -56,7 +56,7 @@ let simulate = lam arg : {
 
   let co : IPMCompileOut = ipmCompile arg.dae { stablize = arg.stabilize } in
   let s = co.init input pc in
-  print (tensorToString int2string (daecoreSolverXOffsets s));
+  print (tensor2string int2string (daecoreSolverXOffsets s));
   recursive let loop = lam t.
     if geqf t arg.tend then ()
     else
