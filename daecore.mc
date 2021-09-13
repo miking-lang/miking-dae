@@ -999,7 +999,7 @@ lam ds. offsetSetYYPLambdas {
 --------------------------
 
 type FirstOrderResidual = {
-    res
+    resf
       : DualNum
       -> Vector DualNum
       -> Vector DualNum
@@ -1076,7 +1076,7 @@ let residual
   let xis = create nx (lam i. i) in
   let uis = create nu (lam i. i) in
   let stateGet = offsetGetYYP arg.ds in
-  let res = lam t. lam y. lam yp. lam u. lam th. lam r.
+  let resf = lam t. lam y. lam yp. lam u. lam th. lam r.
     let stateGet = stateGet y yp in
     let inputGet = lam x : IdOrd. tget (tget u [idOrdId x]) [idOrdOrd x] in
 
@@ -1107,7 +1107,7 @@ let residual
   let es = tensorCopy arg.es in
   let ny = nVariables arg.ds in
 
-  { res = res, ds = ds, es = es, ny = ny }
+  { resf = resf, ds = ds, es = es, ny = ny }
 
 let x0 = 1.
 let dx0 = 2.
@@ -1134,7 +1134,7 @@ utest
   let u = tcreate [2] (lam. tcreate [1] (lam. num 0.)) in
   let r = tcreate [5] (lam. num 0.) in
   let th = tcreate [3] (lam. num 1.) in
-  res.res t y yp u th r;
+  res.resf t y yp u th r;
   map dualnumUnpackNum (tensorToSeqExn r)
 with [
   subf ddx0 (mulf x0 x2),
@@ -1258,7 +1258,7 @@ let residualStabilized
       fNc
   in
 
-  let res = lam t. lam y. lam yp. lam u. lam th. lam r.
+  let resf = lam t. lam y. lam yp. lam u. lam th. lam r.
     let stateGet = stateGetYYP y yp in
     let inputGet = inputGet u in
 
@@ -1311,7 +1311,7 @@ let residualStabilized
     (lam idx. lam d. tset ds idx (addi d (tget arg.lambdas idx)))
     arg.ds;
 
-  { res = res, ds = ds, es = es, ny = addi nvars nmu }
+  { resf = resf, ds = ds, es = es, ny = addi nvars nmu }
 
 
 let x0 = 1.
@@ -1345,7 +1345,7 @@ utest
   let u = tcreate [2] (lam. tcreate [1] (lam. num 0.)) in
   let r = tcreate [6] (lam. num 0.) in
   let th = tcreate [3] (lam. num 1.) in
-  res.res t y yp u th r;
+  res.resf t y yp u th r;
   map dualnumUnpackNum (tensorToSeqExn r)
 with [
   subf ddx0 (mulf x0 x2),
@@ -1365,7 +1365,7 @@ with [
 type DaecoreResidual = {
   -- Residual function f(t, y, yp, u, r), where r stores the result of the
   -- residual.
-  res
+  resf
   : DualNum
   -> Vector DualNum
   -> Vector DualNum
@@ -1412,7 +1412,7 @@ let daecoreResidual : DAE -> DaecoreResidual = lam dae.
       in
 
       {
-        res = res.res,
+        resf = res.resf,
         stateGet = stateGet,
         stateSet = stateSet,
         ds = res.ds,
@@ -1428,7 +1428,7 @@ utest
   let u = tcreate [2] (lam. tcreate [1] (lam. num 0.)) in
   let r = tcreate [5] (lam. num 0.) in
   let t = num 0. in
-  res.res t y yp u r;
+  res.resf t y yp u r;
   tensorToSeqExn r
 with create 5 (lam. num 0.) using eqSeq (dualnumEq eqf)
 
@@ -1512,7 +1512,7 @@ let daecoreResidualStabilized : DAE -> DaecoreResidual = lam dae.
       } fs in
 
       {
-        res = res.res,
+        resf = res.resf,
         stateGet = stateGet,
         stateSet = stateSet,
         ds = res.ds,
@@ -1528,7 +1528,7 @@ utest
   let u = tcreate [2] (lam. tcreate [1] (lam. num 0.)) in
   let r = tcreate [6] (lam. num 0.) in
   let t = num 0. in
-  res.res t y yp u r;
+  res.resf t y yp u r;
   tensorToSeqExn r
 with create 6 (lam. num 0.) using eqSeq (dualnumEq eqf)
 

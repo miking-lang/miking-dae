@@ -63,7 +63,7 @@ let daecoreSolverInit
 	let resf = lam t. lam y. lam yp. lam r.
 		tensorMapExn num y z;
 		tensorMapExn num yp zp;
-		res.res (num t) z zp du dth dr;
+		res.resf (num t) z zp du dth dr;
 		tensorMapExn _unpack dr r;
 		()
 	in
@@ -73,10 +73,10 @@ let daecoreSolverInit
 		tensorMapExn num jacargs.y z;
 		tensorMapExn num jacargs.yp zp;
 
-		jacT (lam z. res.res (num jacargs.t) z zp du dth) z dm;
+		jacT (lam z. res.resf (num jacargs.t) z zp du dth) z dm;
 		tensorIteri (lam idx. lam x. tset m idx (_unpack x)) dm;
 
-		jacT (lam zp. res.res (num jacargs.t) z zp du dth) zp dm;
+		jacT (lam zp. res.resf (num jacargs.t) z zp du dth) zp dm;
 		tensorIteri
 			(lam idx. lam x.
 				tset m idx (addf (tget m idx) (mulf jacargs.c (_unpack x))))
@@ -86,8 +86,8 @@ let daecoreSolverInit
 	in
 
 	let lsolver = idaDlsDense v m in
-	-- let lsolver = idaDlsSolverJacf jacf lsolver in
-	let lsolver = idaDlsSolver lsolver in
+	let lsolver = idaDlsSolverJacf jacf lsolver in
+	-- let lsolver = idaDlsSolver lsolver in
 
 	let varid =
 		let f = lam x. if x then idaVarIdDifferential else idaVarIdAlgebraic in
