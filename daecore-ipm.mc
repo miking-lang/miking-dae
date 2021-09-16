@@ -5,34 +5,8 @@
 
 --Code written by Oscar Eriksson.
 
-include "daecore-sundials.mc"
-
--- The DAE is given on the form:
---
--- F(x, dxdt, d2xdt, ..., u, th, t) = 0,
---
--- where the vectors x, dxdt, and d2xdt holds the dependent variables and their
--- derivatives, u the inputs, th the parameters, and the scalar t is the free
--- variable.
-
--- A tuple `(id, ord)` representing a dependent variable `id` at the
--- differentiation order `ord` w.r.t. the free variable. `id` is assumed to be
--- in the range [0, n-1], where n is the size of the DAE problem.
-type IdOrd = (Int, Int)
-
--- A single scalar residual function in a high-index DAE
-type Residual =
-  Vector (DualNum -> DualNum) ->  -- x, the dependent variables
-  Vector (DualNum -> DualNum) ->  -- u, the inputs
-  Vector DualNum ->               -- th, the parameters
-  DualNum ->                      -- t, the free variable
-  DualNum
-
--- A high index DAE consists of a list of triples, where the first element in
--- the tuple is a residual function, the second element is a list of dependent
--- variables present in this particular residual function, and the third
--- element is a list of inputs appearing in the residual.
-type DAE = [(Residual, [IdOrd], [Int])]
+include "daecore.mc"
+include "daecore-sundials-ad.mc"
 
 -- Computational parameters.
 type IPMParamComp = {
@@ -41,7 +15,14 @@ type IPMParamComp = {
 }
 
 -- The underlying numerical DAE solver is the variable step SUNDIALS IDA solver.
-type IPMSession = DaecoreSolverSession
+type IPMSession = {
+  _solverSession : DaecoreSolverSession,
+  _y : Vector Float,
+  _yp : Vector Float,
+  _u :  Vector Float,
+  _getstate : IdOrd -> Float,
+  _structureU : [IdOrd]
+}
 
 -- Input parameters.
 type IPMInput = {
@@ -92,25 +73,80 @@ type IPMCompileOut =  {
   output : IPMSession -> IPMInput -> IPMParamOut -> [IdOrd] -> [Float]
 }
 
+let _populateU =
+  lam structureU : [IdOrd]. lam uIn : Vector (Vector Float). lam uOut : Vector Float.
+    iteri
+      (lam i. lam u. vecSet uOut i (vecGet (vecGet uIn (idOrdId u)) (idOrdOrd u)))
+      structureU
+
+let _getstate =
+  lam structureY : [IdOrd].
+  lam structureYP : [IdOrd].
+  lam y : Vector Float.
+  lam yp : Vector Float.
+    let ymap = mapFromSeq cmpIdOrd (mapi (lam i. lam y. (y, i)) structureY) in
+    let ypmap = mapFromSeq cmpIdOrd (mapi (lam i. lam y. (y, i)) structureYP) in
+    lam x : IdOrd.
+      if mapMem x ymap then vecGet y (mapFindWithExn x ymap)
+      else if mapMem x ypmap then vecGet yp (mapFindWithExn x ypmap)
+      else error "Invalid Argument: _getstate"
+
 let _init : DaecoreResidual -> IPMInput -> IPMParamComp -> IPMSession =
-lam res. lam input. lam pc.
-  let s =
-    daecoreSolverInit res {
-      rtol = pc.rtol,
-      atol = pc.atol,
-      th = input.th,
-      t0 = input.t0,
-      ivs = input.ivs,
-      u = input.u
-  } in
-  match input.tend with Some tend then
-    daecoreSolverConsistentIvs s tend; s
-  else s
+lam res.
+  -- initialize state and input vectors
+  let ny = length res.structureY in
+  let y = vecCreateFloat ny (lam. 0.) in
+  let yp = vecCreateFloat ny (lam. 0.) in
+  let u = vecCreateFloat (length res.structureU) (lam. 0.) in
+  lam input. lam pc.
+    -- populate state and input vectors
+    let ivs = mapFromSeq cmpIdOrd input.ivs in
+    iteri
+      (lam i. lam x.
+        if mapMem x ivs then vecSet y i (mapFindWithExn x ivs) else ())
+      res.structureY;
+    iteri
+      (lam i. lam x.
+        if mapMem x ivs then vecSet yp i (mapFindWithExn x ivs) else ())
+      res.structureYP;
+    _populateU res.structureU input.u u;
+    -- construct solver session
+    let solverSession = daecoreSolverInit {
+        resf = res.resf,
+        rtol = pc.rtol,
+        atol = pc.atol,
+        t = input.t0,
+        y = y,
+        yp = yp,
+        th = input.th,
+        u = u,
+        isdiff = res.isdiff
+    } in
+    -- try to find consistent initial values of end time is defined
+    (match input.tend with Some tend then
+      daecoreSolverConsistentIvs solverSession { tend = tend, y = y, yp = yp }
+     else ());
+    {
+      _solverSession = solverSession,
+      _y = y,
+      _yp = yp,
+      _u = u,
+      _getstate = _getstate res.structureY res.structureYP y yp,
+      _structureU = res.structureU
+    }
 
 let _trans : IPMSession -> IPMInput -> IPMParamComp -> Bool =
 lam s. lam input. lam pc.
   match input.tend with Some tend then
-    let r = daecoreSolverSolveNormal s tend input.u in
+    -- update internal input vector
+    _populateU s._structureU input.u s._u;
+    -- solve for the current time interval
+    let r = daecoreSolverSolveNormal s._solverSession {
+      tend = tend,
+      y = s._y,
+      yp = s._yp,
+      u = s._u
+    } in
     match r with IdaSuccess _ | IdaRootsFound _ then true
     else false
    else match input.tend with None _ then error "Single step is unimplemented"
@@ -118,15 +154,15 @@ lam s. lam input. lam pc.
 
 let _output
   : IPMSession -> IPMInput -> IPMParamOut -> [IdOrd] -> [Float] =
-lam s. lam input. lam po. lam ys.
-  map (daecoreSolverX s) ys
+lam s. lam input. lam po. lam ys. map s._getstate ys
 
 -- Compiles the DAE `model`. If `stabilize` is `true` the DAE is index-reduced
--- and stabilized, if `false` it is naively index-reduced.
-let ipmCompile : DAE -> { stablize : Bool } -> IPMCompileOut =
+-- and stabilized, if `false` it is naively index-reduced. See the definition of
+-- `DAE` in `daecore-dae.mc`.
+let ipmCompile : [DAE] -> { stabilize : Bool } -> IPMCompileOut =
 lam model. lam ps.
   let res =
-    if ps.stablize then daecoreResidualStabilized model
+    if ps.stabilize then daecoreResidualStabilized model
     else daecoreResidual model
   in
   { init = _init res, trans = _trans, output = _output }

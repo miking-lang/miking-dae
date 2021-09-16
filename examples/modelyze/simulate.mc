@@ -54,7 +54,7 @@ let simulate = lam arg : {
     { t0 = t0, tend = None (), th = arg.th, u = u, ivs = ivs }
   in
 
-  let co : IPMCompileOut = ipmCompile arg.dae { stablize = arg.stabilize } in
+  let co : IPMCompileOut = ipmCompile arg.dae { stabilize = arg.stabilize } in
   let s = co.init input pc in
   print (tensor2string int2string (daecoreSolverXOffsets s));
   recursive let loop = lam t.

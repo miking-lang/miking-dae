@@ -383,4 +383,4 @@ let dae =
 	]
 
 mexpr
-dprint (daeInputs dae)
+dprint (map (lam x : DAE. x.inputs) dae)
