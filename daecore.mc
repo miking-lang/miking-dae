@@ -67,16 +67,16 @@ let testSystems
     dae = {
       residual = lam th. lam u. lam x.
         -- parameters
-        let m = vecGet th 0 in
-        let g = vecGet th 1 in
-        let l = vecGet th 2 in
+        let m = th 0 in
+        let g = th 1 in
+        let l = th 2 in
         -- inputs
-        let u1 = vecGet u 0 in
-        let u2 = vecGet u 1 in
+        let u1 = u 0 in
+        let u2 = u 1 in
         -- states
-        let x1 = vecGet x 0 in
-        let x2 = vecGet x 1 in
-        let x3 = vecGet x 2 in
+        let x1 = x 0 in
+        let x2 = x 1 in
+        let x3 = x 2 in
         -- residual functions
         let f1 = lam t.
           subn (muln m (nder 2 x1 t)) (addn (muln (x1 t) (x3 t)) (u1 t))
@@ -130,23 +130,23 @@ let testSystems
     dae = {
       residual = lam th. lam u. lam x.
         -- inputs
-        let u1 = vecGet u 0 in
-        let u2 = vecGet u 1 in
-        let u3 = vecGet u 2 in
-        let u4 = vecGet u 3 in
-        let u5 = vecGet u 4 in
-        let u6 = vecGet u 5 in
-        let u7 = vecGet u 6 in
-        let u8 = vecGet u 7 in
+        let u1 = u 0 in
+        let u2 = u 1 in
+        let u3 = u 2 in
+        let u4 = u 3 in
+        let u5 = u 4 in
+        let u6 = u 5 in
+        let u7 = u 6 in
+        let u8 = u 7 in
         -- states
-        let x1 = vecGet x 0 in
-        let x2 = vecGet x 1 in
-        let x3 = vecGet x 2 in
-        let x4 = vecGet x 3 in
-        let x5 = vecGet x 4 in
-        let x6 = vecGet x 5 in
-        let x7 = vecGet x 6 in
-        let x8 = vecGet x 7 in
+        let x1 = x 0 in
+        let x2 = x 1 in
+        let x3 = x 2 in
+        let x4 = x 3 in
+        let x5 = x 4 in
+        let x6 = x 5 in
+        let x7 = x 6 in
+        let x8 = x 7 in
         let f1 = lam t.
           addn (u1 t) (addn (x1 t) (x2 t))
         in
@@ -1037,23 +1037,17 @@ let residual
   let stateGet = offsetGetYYP arg.ds in
   let inputGet = offsetGet (idxOffsets arg.es) in
   let resf = lam th. lam u.
-    let fs = fs th in
-    let inputGet = inputGet u in
-    -- Define u_i(t)
-    let u = v inputGet in
-    -- Create u_i(t) for i = 0..nu-1
-    let us = vecCreate nu u in
-    let fs = fs us in
+    -- define theta_i
+    let th = vecGet th in
+    -- define u(t)_i
+    let u = v (inputGet u) in
     lam t. lam y. lam yp. lam r.
-      let stateGet = stateGet y yp in
-      -- Define x_i(t)
-      let x = v stateGet in
-      -- Create x_i(t) for i = 0..nx-1
-      let xs = vecCreate nx x in
-      let fs = fs xs in
-      -- Compute index-reduced residual
+      -- define x(t)_i
+      let x = v (stateGet y yp) in
+      let fs = fs th u x in
+      -- compute index-reduced residual
       iteri (lam i. lam f. vecSet r i (nder (vecGet arg.cs i) f t)) fs;
-      -- Compute alias equations
+      -- compute alias equations
       iteri
         (lam i. lam a : (Int, Int).
           match a with (j, k) then
@@ -1140,29 +1134,23 @@ let residualStabilized
     lambdas : Vector Int,
     us : [[Int]]
   }
-  -> [
-    Vector (DualNum -> DualNum) ->
-    Vector (DualNum -> DualNum) ->
-    Vector DualNum ->
-    DualNum ->
-    DualNum
-  ]
+  -> ResidualFun
   -> FirstOrderResidual
   = lam arg. lam fs.
-  -- Compute input offsets
+  -- compute input offsets
   let es =
     inputOffsets
       (vecMapCopy (lam c. mini 0 (subi c 1)) arg.cs)
       arg.us
   in
-  -- Getters
+  -- getters
   let stateGetY = offsetGet (idxOffsetsFirstOrder arg.ds) in
   let inputGet = offsetGet (idxOffsets es) in
   let stateGetYYP = offsetGetYYPLambdas {
     ds = arg.ds,
     lambdas = arg.lambdas
   } in
-  -- Sort equations
+  -- sort equations
   let se = sortEquations {
     sigma = arg.sigma,
     cs = arg.cs,
@@ -1171,7 +1159,7 @@ let residualStabilized
     blocks = arg.blocks,
     lambdas = arg.lambdas
   } in
-  -- Compute problem sizes
+  -- compute problem sizes
   let nf0d = length se.eqs0d in
   let nf0a = length se.eqs0a in
   let nf0c = length se.eqs0c in
@@ -1181,31 +1169,27 @@ let residualStabilized
   let nu = vecLength es in
   -- number of variables in first-order system
   let nvars = nVariables arg.ds in
-  -- Alias residual
+  -- alias residual
   let aliases = aliases arg.ds in
   let naliases = length aliases in
   -- number of dummy variables
   let nmu = nfNc in
-  -- Pre-allocate intermediate data-structures
+  -- pre-allocate intermediate data-structures
   let g_i = vecCreate nfNc (lam. num 0.) in
   let resf = lam th. lam u.
-    let fs = fs th in
-    -- Define u_i(t)
+    -- define theta_i
+    let th = vecGet th in
+    -- define u(t)_i
     let u = v (inputGet u) in
-    -- Create u_i(t) for i = 0..nu-1
-    let us = vecCreate nu u in
-    let fs = fs us in
     lam t. lam y. lam yp. lam r.
-      -- Differentiated constraint residual
+      -- differentiated constraint residual
       let resNc = lam y. lam r.
         let stateGet = stateGetY y in
-        -- Define x_i(t)
+        -- define x(t)_i
         let x = v stateGet in
-        -- Create x_i(t) for i = 0..nx-1
-        let xs = vecCreate nx x in
-        -- Differentiated constraint residual, except at the highest
+        -- differentiated constraint residual, except at the highest
         -- differentiation order
-        let fs = fs xs in
+        let fs = fs th u x in
         let fNc =
           map (lam e : IdOrd. (get fs (idOrdId e), idOrdOrd e)) se.eqsNc
         in
@@ -1215,29 +1199,27 @@ let residualStabilized
             else never)
           fNc
       in
-      -- Define x_i(t)
+      -- define x(t)_i
       let x = v (stateGetYYP y yp) in
-      -- Create x_i(t) for i = 0..nx-1
-      let xs = vecCreate nx x in
-      let fs = fs xs in
-      -- Non-differentiated differential residual
+      let fs = fs th u x in
+      -- non-differentiated differential residual
       let f0d = map (lam i. get fs i) se.eqs0d in
-      -- Algebraic residual
+      -- algebraic residual
       let f0a = map (lam i. get fs i) se.eqs0a in
-      -- Non-differentiated constraint residual
+      -- non-differentiated constraint residual
       let f0c = map (lam i. get fs i) se.eqs0c in
-      -- Compute non-differentiated differential residual
+      -- compute non-differentiated differential residual
       iteri (lam i. lam f. vecSet r i (f t)) f0d;
-      -- Compute algebraic residual
+      -- compute algebraic residual
       let ofs = nf0d in
       iteri (lam i. lam f. vecSet r (addi i ofs) (f t)) f0a;
-      -- Compute non-differentiated constraint residual
+      -- compute non-differentiated constraint residual
       let ofs = addi ofs nf0a in
       iteri (lam i. lam f. vecSet r (addi i ofs) (f t)) f0c;
-      -- Compute differentiated constraint residual
+      -- compute differentiated constraint residual
       let ofs = addi ofs nf0c in
       resNc y (vecSub r ofs nfNc);
-      -- Compute stabilized alias residual
+      -- compute stabilized alias residual
       iteri
         (lam i. lam a : (Int, Int).
           match a with (j, k) then

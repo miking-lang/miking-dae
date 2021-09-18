@@ -7,16 +7,16 @@ include "../daecore-ipm.mc"
 let pendulum = {
   residual = lam th. lam u. lam x.
     -- parameters
-    let m = vecGet th 0 in
-    let g = vecGet th 1 in
-    let l = vecGet th 2 in
+    let m = th 0 in
+    let g = th 1 in
+    let l = th 2 in
     -- inputs
-    let u1 = vecGet u 0 in
-    let u2 = vecGet u 1 in
+    let u1 = u 0 in
+    let u2 = u 1 in
     -- states
-    let x1 = vecGet x 0 in
-    let x2 = vecGet x 1 in
-    let x3 = vecGet x 2 in
+    let x1 = x 0 in
+    let x2 = x 1 in
+    let x3 = x 2 in
     -- residual functions
     let f1 = lam t.
       subn (muln m (nder 2 x1 t)) (addn (muln (x1 t) (x3 t)) (u1 t))
