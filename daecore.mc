@@ -43,6 +43,7 @@ let and = lam x. lam y. if not x then false else y
 
 type DaecoreTestSystem = {
   dae : DAE,
+  g : ConstraintFun,
   sigma : Matrix Int,
   cs : Vector Int,
   ds : Vector Int,
@@ -104,6 +105,13 @@ let testSystems
         [us1, us2, us3]
     },
 
+    g = lam th. lam u. lam t. lam x.
+      let x1 = x 0 in
+      let x2 = x 1 in
+      lam g.
+        vecSet g 0 (x1 t);
+        vecSet g 1 (x2 t);
+        (),
 
     sigma = matOfSeq (3, 3) [
       2, n, 0,
@@ -200,6 +208,8 @@ let testSystems
 
       inputs = [[0], [1], [2], [3], [4], [5], [6], [7]]
     },
+
+    g = lam. lam. lam. lam. lam. (),
 
     sigma = matOfSeq (8, 8)
       [0, 0, n, n, n, n, n, n  -- x1 - x2
@@ -412,7 +422,7 @@ let mkDependencyGraph : Matrix Int -> Vector Int -> Digraph Int Int =
 lam sigma. lam incidenceJ.
   let n = vecLength incidenceJ in
   let fs = create n (lam i. i) in
-  let g = digraphEmpty eqi eqi in
+  let g = digraphEmpty subi eqi in
   let g = foldl (lam g. lam f. digraphAddVertex f g) g fs in
   matFoldi
     (lam g. lam f. lam v. lam x.
@@ -536,18 +546,12 @@ let sortFindLambda
   let assignedVars = bltAssignedVars arg.incidenceJ arg.blocks in
 
   -- BLT block assigned to each variable
-  let blockAssignedToVars =
-    vecOfSeq (bltAssigned assignedVars vs)
-  in
+  let blockAssignedToVars = vecOfSeq (bltAssigned assignedVars vs) in
 
-  let assignedVars =
-    vecOfSeq assignedVars
-  in
+  let assignedVars = vecOfSeq assignedVars in
 
   -- Variables in each BLT block
-  let bltVars =
-    vecOfSeq (bltVars arg.sigma arg.blocks)
-  in
+  let bltVars = vecOfSeq (bltVars arg.sigma arg.blocks) in
 
   -- Vector indicating if algebraic variable should be substituted with its
   -- derivative. A 0 means no and a 1 means yes.
@@ -1028,7 +1032,7 @@ let residual
     ds : Vector Int,
     es : Vector Int
   }
-  -> ResidualFun
+  -> Residual
   -> FirstOrderResidual
   = lam arg. lam fs.
   let aliases = aliases arg.ds in
@@ -1134,7 +1138,7 @@ let residualStabilized
     lambdas : Vector Int,
     us : [[Int]]
   }
-  -> ResidualFun
+  -> Residual
   -> FirstOrderResidual
   = lam arg. lam fs.
   -- compute input offsets
@@ -1174,64 +1178,62 @@ let residualStabilized
   let naliases = length aliases in
   -- number of dummy variables
   let nmu = nfNc in
-  -- pre-allocate intermediate data-structures
-  let g_i = vecCreate nfNc (lam. num 0.) in
-  let resf = lam th. lam u.
+  let resf = lam th. lam u. lam t. lam y. lam yp. lam r.
+    -- pre-allocate intermediate data-structures
+    let g_i = vecCreate nfNc (lam. num 0.) in
     -- define theta_i
     let th = vecGet th in
     -- define u(t)_i
     let u = v (inputGet u) in
-    lam t. lam y. lam yp. lam r.
-      -- differentiated constraint residual
-      let resNc = lam y. lam r.
-        let stateGet = stateGetY y in
-        -- define x(t)_i
-        let x = v stateGet in
-        -- differentiated constraint residual, except at the highest
-        -- differentiation order
-        let fs = fs th u x in
-        let fNc =
-          map (lam e : IdOrd. (get fs (idOrdId e), idOrdOrd e)) se.eqsNc
-        in
-        iteri
-          (lam i. lam fo : (DualNum -> DualNum, Int).
-            match fo with (f, n) then vecSet r i (nder n f t)
-            else never)
-          fNc
-      in
+    -- differentiated constraint residual
+    let resNc = lam y. lam r.
+      let stateGet = stateGetY y in
       -- define x(t)_i
-      let x = v (stateGetYYP y yp) in
+      let x = v stateGet in
+      -- differentiated constraint residual, except at the highest
+      -- differentiation order
       let fs = fs th u x in
-      -- non-differentiated differential residual
-      let f0d = map (lam i. get fs i) se.eqs0d in
-      -- algebraic residual
-      let f0a = map (lam i. get fs i) se.eqs0a in
-      -- non-differentiated constraint residual
-      let f0c = map (lam i. get fs i) se.eqs0c in
-      -- compute non-differentiated differential residual
-      iteri (lam i. lam f. vecSet r i (f t)) f0d;
-      -- compute algebraic residual
-      let ofs = nf0d in
-      iteri (lam i. lam f. vecSet r (addi i ofs) (f t)) f0a;
-      -- compute non-differentiated constraint residual
-      let ofs = addi ofs nf0a in
-      iteri (lam i. lam f. vecSet r (addi i ofs) (f t)) f0c;
-      -- compute differentiated constraint residual
-      let ofs = addi ofs nf0c in
-      resNc y (vecSub r ofs nfNc);
-      -- compute stabilized alias residual
+      let fNc =
+        map (lam e : IdOrd. (get fs (idOrdId e), idOrdOrd e)) se.eqsNc
+      in
       iteri
-        (lam i. lam a : (Int, Int).
-          match a with (j, k) then
-            jaci (lam y. resNc y) j y g_i;
-            vecMapiInplace (lam i. muln (vecGet yp (addi nvars i))) g_i;
-            let alias = subn (vecGet y j) (vecGet yp k) in
-            let corr = vecFold addn (num 0.) g_i in
-            vecSet r (addi nf i) (addn alias corr)
+        (lam i. lam fo : (DualNum -> DualNum, Int).
+          match fo with (f, n) then vecSet r i (nder n f t)
           else never)
-        aliases;
-
-      ()
+        fNc
+    in
+    -- define x(t)_i
+    let x = v (stateGetYYP y yp) in
+    let fs = fs th u x in
+    -- non-differentiated differential residual
+    let f0d = map (lam i. get fs i) se.eqs0d in
+    -- algebraic residual
+    let f0a = map (lam i. get fs i) se.eqs0a in
+    -- non-differentiated constraint residual
+    let f0c = map (lam i. get fs i) se.eqs0c in
+    -- compute non-differentiated differential residual
+    iteri (lam i. lam f. vecSet r i (f t)) f0d;
+    -- compute algebraic residual
+    let ofs = nf0d in
+    iteri (lam i. lam f. vecSet r (addi i ofs) (f t)) f0a;
+    -- compute non-differentiated constraint residual
+    let ofs = addi ofs nf0a in
+    iteri (lam i. lam f. vecSet r (addi i ofs) (f t)) f0c;
+    -- compute differentiated constraint residual
+    let ofs = addi ofs nf0c in
+    resNc y (vecSub r ofs nfNc);
+    -- compute stabilized alias residual
+    iteri
+      (lam i. lam a : (Int, Int).
+        match a with (j, k) then
+          jaci (lam y. resNc y) j y g_i;
+          vecMapiInplace (lam i. muln (vecGet yp (addi nvars i))) g_i;
+          let alias = subn (vecGet y j) (vecGet yp k) in
+          let corr = vecFold addn (num 0.) g_i in
+          vecSet r (addi nf i) (addn alias corr)
+        else never)
+      aliases;
+    ()
   in
   let structureY =
     join
@@ -1327,60 +1329,66 @@ with (
 -- OBJECTIVE FORMULATION --
 ---------------------------
 
-let augmentedResidualIdOrds = lam cs.
+let offsetToStructure = lam ofs.
   vecFoldi
-    (lam acc. lam i. lam c.
+    (lam acc. lam i. lam x.
       let os =
-        unfoldr (lam o. if gti o c then None () else Some ((i, o), succ o)) 0
+        unfoldr (lam o. if gti o x then None () else Some ((i, o), succ o)) 0
       in
       concat acc os)
     []
-    cs
+    ofs
 
 utest
   let cs = testSystems.pendulum.cs in
-  augmentedResidualIdOrds cs
+  offsetToStructure cs
 with [(0, 0), (1, 0), (2, 0), (2, 1), (2, 2)]
 
+utest
+  let ds = testSystems.pendulum.ds in
+  let sget = offsetGet (idxOffsets ds) in
+  let x = vecOfSeq (range 0 7 1) in
+  map (sget x) [(0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2), (2, 0)]
+with (range 0 7 1) using eqSeq eqi
 
 let objective =
-lam arg : { res : [ResidualFun], cs : Vector Int, ds : Vector Int }.
-  let nx = vecLength arg.ds in
-  let idords = augmentedResidualIdOrds arg.cs in
-  let res =
-    map (lam io : Idords. nder (idOrdDer io) (get arg.res (idOrdDer io))) idords
-  in
+lam arg : { fs : Residual, cs : Vector Int, ds : Vector Int, es : Vector Int }.
+  let idords = offsetToStructure arg.cs in
   let stateGet = offsetGet (idxOffsets arg.ds) in
+  let inputGet = offsetGet (idxOffsets arg.es) in
   lam th. lam u. lam t. lam x.
-    -- define x_i(t)
-    let x = v stateGet in
-    -- create x_i(t) for i = 0..nx-1
-    let xs = vecCreate nx x in
+    -- define theta_i
+    let th = vecGet th in
+    -- define u(t)_i
+    let u = v (inputGet u) in
+    -- define x(t)_i
+    let x = v (stateGet x) in
     -- compute objective
-    foldl1
-      (lam obj. lam f.
-        let f = f xs u th t in
-        addn obj (muln f f))
-      res
+    let fs = arg.fs th u x in
+    let fs =
+      map (lam io : Idords. nder (idOrdOrd io) (get fs (idOrdId io)) t) idords
+    in
+    foldl (lam obj. lam f. addn obj (muln f f)) (num 0.) fs
 
-let constraints =
-lam arg : { gs : [ConstraintFun], ds : Vector Int }.
-  let nx = vecLength arg.ds in
+let constraintFun =
+lam arg : { g : ConstraintFun, ds : Vector Int, es : Vector Int }.
   let stateGet = offsetGet (idxOffsets arg.ds) in
+  let inputGet = offsetGet (idxOffsets arg.es) in
   lam th. lam u. lam t. lam x. lam g.
-    -- define x_i(t)
-    let x = v stateGet in
-    -- create x_i(t) for i = 0..nx-1
-    let xs = vecCreate nx x in
-    -- compute constraints
-    iteri (lam i. lam g. vecSet g i (g xs u th t)) arg.gs;
+    -- define theta_i
+    let th = vecGet th in
+    -- define u(t)_i
+    let u = v (inputGet u) in
+    -- define x(t)_i
+    let x = v (stateGet x) in
+    arg.g th u t x g;
     ()
 
 ----------------------
 -- MAIN ENTRY POINT --
 ----------------------
 
-type DaecoreResidual = {
+type DaecoreIVP = {
   -- Residual function f(t, y, yp, u, r), where r stores the result of the
   -- residual.
   resf
@@ -1392,10 +1400,10 @@ type DaecoreResidual = {
   -> Vector DualNum             -- vector to store the value of the residual
   -> (),
 
-  -- Structure of y, associates variables of the ofiginal problem to y.
+  -- Structure of y, associates variables of the original problem to y.
   structureY : [IdOrd],
 
-  -- Structure of y', associates variables of the ofiginal problem to y'.
+  -- Structure of y', associates variables of the original problem to y'.
   structureYP : [IdOrd],
 
   -- Struture of u, inputs may appear differentiated in the index-reduced
@@ -1403,11 +1411,32 @@ type DaecoreResidual = {
   structureU : [IdOrd],
 
   -- Variables in y appearing differentiated in the residual.
-  isdiff : [Bool]
+  isdiff : [Bool],
+
+  -- Ojbjective function
+  objf
+  : DualNum                     -- free variable t
+  -> Vector DualNum             -- parameter vector theta
+  -> Vector DualNum             -- input vector u
+  -> Vector DualNum             -- state vector x
+  -> DualNum,
+
+  -- Constraint function
+  g
+  : Vector DualNum              -- parameter vector theta
+  -> Vector DualNum             -- input vector u
+  -> DualNum                    -- free variable t
+  -> Vector DualNum             -- state vector x
+  -> Vector DualNum             -- vector to store the result of evaluation
+  -> (),
+
+  -- Structure of x, associates variables of the original problem to x.
+  structureX : [IdOrd]
 }
 
 -- Non-stabilized low-index residual
-let daecoreResidual : DAE -> DaecoreResidual = lam dae.
+let daecoreIVP : DAE -> ConstraintFun -> DaecoreIVP
+= lam dae. lam g.
   let fs = dae.residual in
   let vs = dae.variables in
   let us = dae.inputs in
@@ -1419,29 +1448,89 @@ let daecoreResidual : DAE -> DaecoreResidual = lam dae.
     let res : FirstOrderResidual =
       residual { cs = cs, ds = ds, es = es } fs
     in
+    let objf = objective { fs = fs, cs = cs, ds = ds, es = es } in
+    let g = constraintFun { g = g, ds = ds, es = es } in
+    let structureX = offsetToStructure ds in
     {
       resf = res.resf,
       structureY = res.structureY,
       structureYP = res.structureYP,
       structureU = res.structureU,
-      isdiff = res.isdiff
+      isdiff = res.isdiff,
+      objf = objf,
+      g = g,
+      structureX = structureX
     }
   else never
 
 utest
-  let res = daecoreResidual testSystems.pendulum.dae in
+  let ivp = daecoreIVP testSystems.pendulum.dae testSystems.pendulum.g in
   let y = vecOfSeq (map num [1., 0., 0., 0., 0.]) in
   let yp = vecOfSeq (map num [0., 0., 0., negf 1., 0.]) in
   let th = vecCreate 3 (lam. num 1.) in
   let u = vecCreate 2 (lam. num 0.) in
   let r = vecCreate 5 (lam. num 0.) in
   let t = num 0. in
-  res.resf th u t y yp r;
+  ivp.resf th u t y yp r;
   vecToSeq r
 with create 5 (lam. num 0.) using eqSeq (dualnumEq eqf)
 
+utest
+  let ivp = daecoreIVP testSystems.pendulum.dae testSystems.pendulum.g in
+  let x =
+    vecOfSeq
+      (map num [
+        0.707107,
+        0.,
+        negf 0.5,
+        negf 0.707107,
+        0.,
+        negf 0.5,
+        negf 0.707107]
+      )
+  in
+  let th = vecCreate 3 (lam. num 1.) in
+  let u = vecCreate 2 (lam. num 0.) in
+  let t = num 0. in
+  _unpack (ivp.objf th u t x)
+with 0. using eqfApprox 1.e-10
+
+utest
+  let ivp = daecoreIVP testSystems.pendulum.dae testSystems.pendulum.g in
+  let x =
+    vecOfSeq
+      (map num [
+        0.707107,
+        0.,
+        negf 0.5,
+        negf 0.707107,
+        0.,
+        negf 0.5,
+        negf 0.707107]
+      )
+  in
+  let th = vecCreate 3 (lam. num 1.) in
+  let u = vecCreate 2 (lam. num 0.) in
+  let t = num 0. in
+  let g = vecCreate 2 (lam. num 0.) in
+  ivp.g th u t x g;
+  vecToSeq g
+with [num 0.707107, num (negf 0.707107)]
+
+utest
+  let ivp = daecoreIVP testSystems.pendulum.dae testSystems.pendulum.g in
+  (ivp.structureY, ivp.structureYP, ivp.structureU, ivp.isdiff, ivp.structureX)
+with (
+  [(0, 0), (0, 1), (1, 0), (1, 1), (2, 0)],
+  [(0, 1), (0, 2), (1, 1), (1, 2), (2, 1)],
+  [(0, 0), (1, 0)],
+  [true, true, true, true, false],
+  [(0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2), (2, 0)]
+)
+
 -- Stabilized low-index residual
-let daecoreResidualStabilized : DAE -> DaecoreResidual = lam dae.
+let daecoreIVPStabilized : DAE -> ConstraintFun -> DaecoreIVP
+= lam dae. lam g.
   let fs = dae.residual in
   let vs = dae.variables in
   let us = dae.inputs in
@@ -1466,23 +1555,66 @@ let daecoreResidualStabilized : DAE -> DaecoreResidual = lam dae.
       blocks = blocks,
       us = us
     } fs in
+    let objf = objective { fs = fs, cs = cs, ds = ds, es = es } in
+    let g = constraintFun { g = g, ds = ds, es = es } in
+    let structureX = offsetToStructure ds in
     {
       resf = res.resf,
       structureY = res.structureY,
       structureYP = res.structureYP,
       structureU = res.structureU,
-      isdiff = res.isdiff
+      isdiff = res.isdiff,
+      objf = objf,
+      g = g,
+      structureX = structureX
     }
   else never
 
 utest
-  let res = daecoreResidualStabilized testSystems.pendulum.dae in
+  let ivp =
+    daecoreIVPStabilized testSystems.pendulum.dae testSystems.pendulum.g
+  in
   let y = vecOfSeq (map num [1., 0., 0., 0., 0., 0.]) in
   let yp = vecOfSeq (map num [0., 0., 0., negf 1., 0., 0.]) in
   let th = vecCreate 3 (lam. num 1.) in
   let u = vecCreate 2 (lam. num 0.) in
   let r = vecCreate 6 (lam. num 0.) in
   let t = num 0. in
-  res.resf th u t y yp r;
+  ivp.resf th u t y yp r;
   vecToSeq r
 with create 6 (lam. num 0.) using eqSeq (dualnumEq eqf)
+
+utest
+  let ivp =
+    daecoreIVPStabilized testSystems.pendulum.dae testSystems.pendulum.g
+  in
+  let x =
+    vecOfSeq
+      (map num [
+        0.707107,
+        0.,
+        negf 0.5,
+        negf 0.707107,
+        0.,
+        negf 0.5,
+        negf 0.707107]
+      )
+  in
+  let th = vecCreate 3 (lam. num 1.) in
+  let u = vecCreate 2 (lam. num 0.) in
+  let t = num 0. in
+  _unpack (ivp.objf th u t x)
+with 0. using eqfApprox 1.e-10
+
+utest
+  let ivp =
+    daecoreIVPStabilized testSystems.pendulum.dae testSystems.pendulum.g
+  in
+  (ivp.structureY, ivp.structureYP, ivp.structureU, ivp.isdiff, ivp.structureX)
+with (
+  [(0, 0), (0, 1), (1, 0), (1, 1), (2, negi 1), (3, negi 1)],
+  [(0, 1), (0, 2), (1, 1), (1, 2), (2, 0), (3, 0)],
+  [(0, 0), (1, 0)],
+  [true, true, true, true, true, true],
+  [(0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2), (2, 0)]
+)
