@@ -4,42 +4,45 @@
 include "../daecore-ipm.mc"
 
 -- A pendulum in Cartesian coordinates (index-3 DAE).
-let pendulum =
-  let f1 = lam x. lam u. lam th. lam t.
-    let m = vecGet th 0 in
-    let u1 = vecGet u 0 in
-    let x1 = vecGet x 0 in
-    let x3 = vecGet x 2 in
-    subn (muln m (nder 2 x1 t)) (addn (muln (x1 t) (x3 t)) (u1 t))
-  in
-  let xs1 = [(0, 0), (0, 2), (2, 0)] in
-  let us1 = [0] in
-  let f2 = lam x. lam u. lam th. lam t.
+let pendulum = {
+  residual = lam th. lam u. lam x.
+    -- parameters
     let m = vecGet th 0 in
     let g = vecGet th 1 in
-    let u2 = vecGet u 1 in
-    let x2 = vecGet x 1 in
-    let x3 = vecGet x 2 in
-    addn
-      (subn (muln m (nder 2 x2 t)) (addn (muln (x2 t) (x3 t)) (u2 t)))
-      (muln m g)
-  in
-  let xs2 = [(1, 0), (1, 2), (2, 0)] in
-  let us2 = [1] in
-  let f3 = lam x. lam u. lam th. lam t.
     let l = vecGet th 2 in
+    -- inputs
+    let u1 = vecGet u 0 in
+    let u2 = vecGet u 1 in
+    -- states
     let x1 = vecGet x 0 in
     let x2 = vecGet x 1 in
-    subn (addn (muln (x1 t) (x1 t)) (muln (x2 t) (x2 t))) (muln l l)
-  in
-  let xs3 = [(0, 0), (1, 0)] in
-  let us3 = [] in
-  [
-    { residual = f1, variables = xs1, inputs = us1 },
-    { residual = f2, variables = xs2, inputs = us2 },
-    { residual = f3, variables = xs3, inputs = us3 }
-  ]
+    let x3 = vecGet x 2 in
+    -- residual functions
+    let f1 = lam t.
+      subn (muln m (nder 2 x1 t)) (addn (muln (x1 t) (x3 t)) (u1 t))
+    in
+    let f2 = lam t.
+      addn
+        (subn (muln m (nder 2 x2 t)) (addn (muln (x2 t) (x3 t)) (u2 t)))
+        (muln m g)
+    in
+    let f3 = lam t.
+      subn (addn (muln (x1 t) (x1 t)) (muln (x2 t) (x2 t))) (muln l l)
+    in
+    [f1, f2, f3],
 
+  variables =
+    let xs1 = [(0, 0), (0, 2), (2, 0)] in
+    let xs2 = [(1, 0), (1, 2), (2, 0)] in
+    let xs3 = [(0, 0), (1, 0)] in
+    [xs1, xs2, xs3],
+
+  inputs =
+    let us1 = [0] in
+    let us2 = [1] in
+    let us3 = [] in
+    [us1, us2, us3]
+}
 
 -- Physical parameters.
 let m = 0.5     -- Pendulum mass [Kg]
