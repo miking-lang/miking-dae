@@ -1,9 +1,11 @@
 include "math.mc"
 include "ad/dualnum.mc"
-include "tensor.mc"
 include "maxmatch-tensor.mc"
 include "digraph.mc"
 include "set.mc"
+include "mat.mc"
+include "vec.mc"
+include "daecore-dae.mc"
 
 -------------------
 -- PRELIMINARIES --
@@ -23,9 +25,6 @@ let filteri = lam p.
 
 -- For brevity
 let num = dualnumNum
-let tget = tensorGetExn
-let tset = tensorSetExn
-let tcreate = tensorCreateDense
 
 -- Constants
 let _neginf = negi (1000000)
@@ -38,58 +37,13 @@ let sigmaNoEdge = _neginf
 let or = lam x. lam y. if x then true else y
 let and = lam x. lam y. if not x then false else y
 
--- For documentation purposes, we indicate the rank of tensors
-type Vector a = Tensor[a]
-type Matrix a = Tensor[a]
-
-------------------------------------------------
--- DIFFERENTIAL ALGEBRAIC SYSTEM OF EQUATIONS --
-------------------------------------------------
-
--- A tuple representing an identifier and differentiation order.
-type IdOrd = (Int, Int)
-let idOrdId = lam x : IdOrd. x.0
-let idOrdOrd = lam x : IdOrd. x.1
-let cmpIdOrd = lam x : IdOrd. lam y : IdOrd.
-  if eqi (idOrdId x) (idOrdId y) then subi (idOrdOrd x) (idOrdOrd y)
-  else subi (idOrdId x) (idOrdId y)
-let idOrdDer = lam x : IdOrd. (x.0, succ x.1)
-let idOrdInt = lam x : IdOrd. (x.0, pred x.1)
-
--- A single scalar residual function in a high-index DAE
-type Residual =
-  Vector (DualNum -> DualNum) ->
-  Vector (DualNum -> DualNum) ->
-  Vector DualNum ->
-  DualNum ->
-  DualNum
-
--- A high index DAE consists of a list of tuples, where the first element in the
--- tuple is a residual function and the second element is a list of dependent
--- variables present in this particular residual function.
-type DAE = [(Residual, [IdOrd], [Int])]
-
-let daeResiduals : DAE -> [Residual] =
-  map (lam x : (Residual, [IdOrd], [Int]). x.0)
-
-let daeVars : DAE -> [[IdOrd]] =
-  map (lam x : (Residual, [IdOrd], [Int]). x.1)
-
-let daeInputs : DAE -> [[Int]] =
-  map (lam x : (Residual, [IdOrd], [Int]). x.2)
-
-let daeConsistent : DAE -> Bool =
-lam dae.
-  let ids = setToSeq (setOfSeq subi (map idOrdId (join (daeVars dae)))) in
-  let n = length dae in
-  and (eqi (length ids) n) (lti (maxOrElse (lam. 0) subi ids) n)
-
 ------------------
 -- TEST SYSTEMS --
 ------------------
 
 type DaecoreTestSystem = {
   dae : DAE,
+  g : ConstraintFun,
   sigma : Matrix Int,
   cs : Vector Int,
   ds : Vector Int,
@@ -111,149 +65,153 @@ let testSystems
   let n = sigmaNoEdge in
 {
   pendulum = {
-    dae =
-      let f1 = lam xs. lam us. lam ths. lam t.
-        let m = tget ths [0] in
-        let u1 = tget us [0] in
-        let x1 = tget xs [0] in
-        let x3 = tget xs [2] in
-        subn (muln m (nder 2 x1 t)) (addn (muln (x1 t) (x3 t)) (u1 t))
-      in
-      let xs1 = [(0, 0), (0, 2), (2, 0)] in
-      let us1 = [0] in
-      let f2 = lam xs. lam us. lam ths. lam t.
-        let m = tget ths [0] in
-        let g = tget ths [1] in
-        let u2 = tget us [1] in
-        let x2 = tget xs [1] in
-        let x3 = tget xs [2] in
-        addn
-          (subn (muln m (nder 2 x2 t)) (addn (muln (x2 t) (x3 t)) (u2 t)))
-          (muln m g)
-      in
-      let xs2 = [(1, 0), (1, 2), (2, 0)] in
-      let us2 = [1] in
-      let f3 = lam xs. lam us. lam ths. lam t.
-        let l = tget ths [2] in
-        let x1 = tget xs [0] in
-        let x2 = tget xs [1] in
-        subn (addn (muln (x1 t) (x1 t)) (muln (x2 t) (x2 t))) (muln l l)
-      in
-      let xs3 = [(0, 0), (1, 0)] in
-      let us3 = [] in
-      [(f1, xs1, us1), (f2, xs2, us2), (f3, xs3, us3)],
+    dae = {
+      residual = lam th. lam u. lam x.
+        -- parameters
+        let m = th 0 in
+        let g = th 1 in
+        let l = th 2 in
+        -- inputs
+        let u1 = u 0 in
+        let u2 = u 1 in
+        -- states
+        let x1 = x 0 in
+        let x2 = x 1 in
+        let x3 = x 2 in
+        -- residual functions
+        let f1 = lam t.
+          subn (muln m (nder 2 x1 t)) (addn (muln (x1 t) (x3 t)) (u1 t))
+        in
+        let f2 = lam t.
+          addn
+            (subn (muln m (nder 2 x2 t)) (addn (muln (x2 t) (x3 t)) (u2 t)))
+            (muln m g)
+        in
+        let f3 = lam t.
+          subn (addn (muln (x1 t) (x1 t)) (muln (x2 t) (x2 t))) (muln l l)
+        in
+        [f1, f2, f3],
 
-    sigma =
-      tensorOfSeqExn tcreate [3, 3]
-        [2, n, 0
-        ,n, 2, 0
-        ,0, 0, n],
+      variables =
+        let xs1 = [(0, 0), (0, 2), (2, 0)] in
+        let xs2 = [(1, 0), (1, 2), (2, 0)] in
+        let xs3 = [(0, 0), (1, 0)] in
+        [xs1, xs2, xs3],
 
-    cs = tensorOfSeqExn tcreate [3] [0, 0, 2],
-    ds = tensorOfSeqExn tcreate [3] [2, 2, 0],
-    es = tensorOfSeqExn tcreate [2] [0, 0],
-    incidenceI = tensorOfSeqExn tcreate [3] [0, 2, 1],
-    incidenceJ = tensorOfSeqExn tcreate [3] [0, 2, 1],
+      inputs =
+        let us1 = [0] in
+        let us2 = [1] in
+        let us3 = [] in
+        [us1, us2, us3]
+    },
+
+    g = lam th. lam u. lam t. lam x.
+      let x1 = x 0 in
+      let x2 = x 1 in
+      lam g.
+        vecSet g 0 (x1 t);
+        vecSet g 1 (x2 t);
+        (),
+
+    sigma = matOfSeq (3, 3) [
+      2, n, 0,
+      n, 2, 0,
+      0, 0, n
+    ],
+
+    cs = vecOfSeq [0, 0, 2],
+    ds = vecOfSeq [2, 2, 0],
+    es = vecOfSeq [0, 0],
+    incidenceI = vecOfSeq [0, 2, 1],
+    incidenceJ = vecOfSeq [0, 2, 1],
     blocks = [[0, 1, 2]],
     assignedVars = [[0, 2, 1]],
     assignedBlocks = [0, 0, 0],
     varsInBlock = [[0, 1, 2]],
-    lambdas = tensorOfSeqExn tcreate [3] [0, 0, 1],
-    varIdxOffsets = tensorOfSeqExn tcreate [3] [0, 2, 4],
-    inputIdxOffsets = tensorOfSeqExn tcreate [2] [0, 1],
+    lambdas = vecOfSeq [0, 0, 1],
+    varIdxOffsets = vecOfSeq [0, 2, 4],
+    inputIdxOffsets = vecOfSeq [0, 1],
     aliases = [(1, 0), (3, 2)]
   },
 
   linsysOtter = {
-    dae =
-      let f1 = lam xs. lam us. lam ths. lam t.
-        let u1 = tget us [0] in
-        let x1 = tget xs [0] in
-        let x2 = tget xs [1] in
-        addn (u1 t) (addn (x1 t) (x2 t))
-      in
-      let xs1 = [(0, 0), (1, 0)] in
-      let us1 = [0] in
-      let f2 = lam xs. lam us. lam ths. lam t.
-        let u2 = tget us [1] in
-        let x1 = tget xs [0] in
-        let x2 = tget xs [1] in
-        let x3 = tget xs [2] in
-        let x6 = tget xs [5] in
-        addn (u2 t) (addn (x1 t) (subn (x2 t) (subn (x3 t) (der x6 t))))
-      in
-      let xs2 = [(0, 0), (1, 0), (2, 0), (5, 1)] in
-      let us2 = [1] in
-      let f3 = lam xs. lam us. lam ths. lam t.
-        let u3 = tget us [2] in
-        let x1 = tget xs [0] in
-        let x3 = tget xs [2] in
-        let x4 = tget xs [3] in
-        addn (u3 t) (addn (x1 t) (subn (der x3 t) (x4 t)))
-      in
-      let xs3 = [(0, 0), (2, 1), (3, 0)] in
-      let us3 = [2] in
-      let f4 = lam xs. lam us. lam ths. lam t.
-        let u4 = tget us [3] in
-        let x1 = tget xs [0] in
-        let x2 = tget xs [1] in
-        let x3 = tget xs [2] in
-        let x4 = tget xs [3] in
-        let x6 = tget xs [5] in
-        addn (u4 t)
-             (addn (muln (num 2.) (nder 2 x1 t))
-                   (addn (nder 2 x2 t)
-                         (addn (nder 2 x3 t)
-                               (addn (der x4 t)
-                                     (nder 3 x6 t)))))
-      in
-      let xs4 = [(0, 2), (1, 2), (2, 2), (3, 1), (5, 3)] in
-      let us4 = [3] in
-      let f5 = lam xs. lam us. lam ths. lam t.
-        let u5 = tget us [4] in
-        let x1 = tget xs [0] in
-        let x2 = tget xs [1] in
-        let x5 = tget xs [4] in
-        let x8 = tget xs [7] in
-        addn (u5 t)
-             (addn (muln (num 3.) (nder 3 x1 t))
-                   (addn (muln (num 2.) (nder 3 x2 t))
-                         (addn (x5 t)
-                               (muln (num 0.1) (x8 t)))))
-      in
-      let xs5 = [(0, 2), (1, 2), (4, 0), (7, 0)] in
-      let us5 = [4] in
-      let f6 = lam xs. lam us. lam ths. lam t.
-        let u6 = tget us [5] in
-        let x6 = tget xs [5] in
-        let x7 = tget xs [6] in
-        addn (u6 t)
-             (addn (muln (num 2.) (x6 t))
-                   (x7 t))
-      in
-      let xs6 = [(5, 0), (6, 0)] in
-      let us6 = [5] in
-      let f7 = lam xs. lam us. lam ths. lam t.
-        let u7 = tget us [6] in
-        let x6 = tget xs [5] in
-        let x7 = tget xs [6] in
-        addn (u7 t)
-             (addn (muln (num 3.) (x6 t))
-                   (muln (num 4.) (x7 t)))
-      in
-      let xs7 = [(5, 0), (6, 0)] in
-      let us7 = [6] in
-      let f8 = lam xs. lam us. lam ths. lam t.
-        let u8 = tget us [7] in
-        let x8 = tget xs [7] in
-        addn (u8 t) (x8 t)
-      in
-      let xs8 = [(7, 0)] in
-      let us8 = [7] in
-      [(f1, xs1, us1), (f2, xs2, us2), (f3, xs3, us3), (f4, xs4, us4),
-       (f5, xs5, us5), (f6, xs6, us6), (f7, xs7, us7), (f8, xs8, us8)],
+    dae = {
+      residual = lam th. lam u. lam x.
+        -- inputs
+        let u1 = u 0 in
+        let u2 = u 1 in
+        let u3 = u 2 in
+        let u4 = u 3 in
+        let u5 = u 4 in
+        let u6 = u 5 in
+        let u7 = u 6 in
+        let u8 = u 7 in
+        -- states
+        let x1 = x 0 in
+        let x2 = x 1 in
+        let x3 = x 2 in
+        let x4 = x 3 in
+        let x5 = x 4 in
+        let x6 = x 5 in
+        let x7 = x 6 in
+        let x8 = x 7 in
+        let f1 = lam t.
+          addn (u1 t) (addn (x1 t) (x2 t))
+        in
+        let f2 = lam t.
+          addn (u2 t) (addn (x1 t) (subn (x2 t) (subn (x3 t) (der x6 t))))
+        in
+        let f3 = lam t.
+          addn (u3 t) (addn (x1 t) (subn (der x3 t) (x4 t)))
+        in
+        let f4 = lam t.
+          addn (u4 t)
+               (addn (muln (num 2.) (nder 2 x1 t))
+                     (addn (nder 2 x2 t)
+                           (addn (nder 2 x3 t)
+                                 (addn (der x4 t)
+                                       (nder 3 x6 t)))))
+        in
+        let f5 = lam t.
+          addn (u5 t)
+               (addn (muln (num 3.) (nder 3 x1 t))
+                     (addn (muln (num 2.) (nder 3 x2 t))
+                           (addn (x5 t)
+                                 (muln (num 0.1) (x8 t)))))
+        in
+        let f6 = lam t.
+          addn (u6 t)
+               (addn (muln (num 2.) (x6 t))
+                     (x7 t))
+        in
+        let f7 = lam t.
+          addn (u7 t)
+               (addn (muln (num 3.) (x6 t))
+                     (muln (num 4.) (x7 t)))
+        in
+        let f8 = lam t.
+          addn (u8 t) (x8 t)
+        in
+        [f1, f2, f3, f4, f5, f6, f7, f8],
 
-    sigma = tensorOfSeqExn tcreate [8, 8]
+      variables =
+        let xs1 = [(0, 0), (1, 0)] in
+        let xs2 = [(0, 0), (1, 0), (2, 0), (5, 1)] in
+        let xs3 = [(0, 0), (2, 1), (3, 0)] in
+        let xs4 = [(0, 2), (1, 2), (2, 2), (3, 1), (5, 3)] in
+        let xs5 = [(0, 2), (1, 2), (4, 0), (7, 0)] in
+        let xs6 = [(5, 0), (6, 0)] in
+        let xs7 = [(5, 0), (6, 0)] in
+        let us7 = [6] in
+        let xs8 = [(7, 0)] in
+        [xs1, xs2, xs3, xs4, xs5, xs6, xs7, xs8],
+
+      inputs = [[0], [1], [2], [3], [4], [5], [6], [7]]
+    },
+
+    g = lam. lam. lam. lam. lam. (),
+
+    sigma = matOfSeq (8, 8)
       [0, 0, n, n, n, n, n, n  -- x1 - x2
       ,0, 0, 0, n, n, 1, n, n  -- x1 + x2 - x3 + x6'
       ,0, n, 1, 0, n, n, n, n  -- x1 + x3' - x4
@@ -263,18 +221,18 @@ let testSystems
       ,n, n, n, n, n, 0, 0, n  -- 3x6 + 4x7
       ,n, n, n, n, n, n, n, 0],-- x8
 
-    cs = tensorOfSeqExn tcreate [8] [2, 2, 1, 0, 0, 3, 3, 0],
-    ds = tensorOfSeqExn tcreate [8] [2, 2, 2, 1, 0, 3, 3, 0],
-    es = tensorOfSeqExn tcreate [8] [2, 2, 1, 0, 0, 3, 3, 0],
-    incidenceI = tensorOfSeqExn tcreate [8] [1, 0, 2, 3, 4, 6, 5, 7],
-    incidenceJ = tensorOfSeqExn tcreate [8] [1, 0, 2, 3, 4, 6, 5, 7],
+    cs = vecOfSeq [2, 2, 1, 0, 0, 3, 3, 0],
+    ds = vecOfSeq [2, 2, 2, 1, 0, 3, 3, 0],
+    es = vecOfSeq [2, 2, 1, 0, 0, 3, 3, 0],
+    incidenceI = vecOfSeq [1, 0, 2, 3, 4, 6, 5, 7],
+    incidenceJ = vecOfSeq [1, 0, 2, 3, 4, 6, 5, 7],
     blocks = [[0, 1, 2, 3], [4], [5, 6], [7]],
     assignedVars = [[0, 1, 2, 3], [4], [5, 6], [7]],
     assignedBlocks = [0, 0, 0, 0, 1, 2, 2, 3],
     varsInBlock = [[0, 1, 2, 3, 5], [0, 1, 4, 7], [5, 6], [7]],
-    lambdas = tensorOfSeqExn tcreate [8] [0, 0, 0, 0, 1, 0, 0, 0],
-    varIdxOffsets = tensorOfSeqExn tcreate [8] [0, 2, 4, 6, 7, 8, 11, 14],
-    inputIdxOffsets = tcreate [0] (lam. 0),
+    lambdas = vecOfSeq [0, 0, 0, 0, 1, 0, 0, 0],
+    varIdxOffsets = vecOfSeq [0, 2, 4, 6, 7, 8, 11, 14],
+    inputIdxOffsets = vecCreate 0 (lam. 0),
     aliases = [(1, 0), (3, 2), (5, 4), (9, 8), (10, 9), (12, 11), (13, 12)]
   }
 }
@@ -289,28 +247,28 @@ let testSystems
 let sigmaMatrix : [[IdOrd]] -> Matrix Int =
   lam xss.
     let n = length xss in
-    let t = tcreate [n, n] (lam. sigmaNoEdge) in
+    let t = matCreate (n, n) (lam. lam. sigmaNoEdge) in
     iteri
       (lam i. lam xs.
         iter
           (lam x.
-            let d = maxi (tget t [i, idOrdId x]) (idOrdOrd x) in
-            tset t [i, idOrdId x] d)
+            let d = maxi (matGet t i (idOrdId x)) (idOrdOrd x) in
+            matSet t i (idOrdId x) d)
           xs)
       xss;
     t
 
 utest
-  let xss = daeVars testSystems.pendulum.dae in
-  sigmaMatrix xss
+  let xs = testSystems.pendulum.dae.variables in
+  sigmaMatrix xs
 with testSystems.pendulum.sigma
-using tensorEq eqi
+using matEq eqi
 
 utest
-  let xss = daeVars testSystems.linsysOtter.dae in
-  sigmaMatrix xss
+  let xs = testSystems.linsysOtter.dae.variables in
+  sigmaMatrix xs
 with testSystems.linsysOtter.sigma
-using tensorEq eqi
+using matEq eqi
 
 
 -- Finds equation offset vector `cs` and variable offset vector `ds` given
@@ -327,46 +285,46 @@ let sigmaIndexReduce
      }
   = lam sigma.
 
-  let n = get (tensorShape sigma) 0 in
+  let n = (matDim sigma).0 in
 
   let solverPrimalProblem = maxmatchFindMatch in
 
   let solveDualProblem = lam incidenceI. lam ds. lam cs.
 
-    let sigmaTr = tensorTransposeExn sigma 0 1 in
-    let tmpSigma = tcreate (tensorShape sigma) (lam. 0) in
-    let tmpCs = tcreate [n] (lam. 0) in
+    let sigmaTr = matTranspose sigma in
+    let tmpSigma = matCreate (matDim sigma) (lam. lam. 0) in
+    let tmpCs = vecCreate n (lam. 0) in
 
     recursive let loop = lam.
-      tensorMapExn (lam c. c) cs tmpCs;
+      vecBlit cs tmpCs;
 
       -- d[j] <- max_i(sigma[i][j] + c[i])
-      tensorMapiExn (lam idx. lam s.
-                      let j = get idx 1 in addi (tget cs [j]) s)
-                    sigmaTr
-                    tmpSigma;
+      matMapi
+        (lam. lam j. lam s. lam. addi (vecGet cs j) s)
+        sigmaTr
+        tmpSigma;
 
-      tensorIterSlice (lam j. lam row. tset ds [j] (tensorMax subi row))
-                      tmpSigma;
+      matIterRow
+        (lam j. lam row. vecSet ds j (vecMax subi row))
+        tmpSigma;
 
       -- c[i] <- d[incidenceI[i]] - sigma[i][incidenceI[i]]
-      tensorMapiInplace
-        (lam idx. lam.
-          let i = get idx 0 in
-          let ii = tget incidenceI idx in
-          subi (tget ds [ii]) (tget sigma [i, ii]))
+      vecMapiInplace
+        (lam i. lam.
+          let j = vecGet incidenceI i in
+          subi (vecGet ds j) (matGet sigma i j))
           cs;
 
-      tensorMapiExn (lam i. lam c. subi c (tget tmpCs i)) cs tmpCs;
+      vecMap subi cs tmpCs;
 
-      if tensorAll (eqi 0) tmpCs then ()
+      if vecAll (eqi 0) tmpCs then ()
       else loop ()
     in
     loop ()
   in
 
   -- Start of algorithm
-  if or (neqi (tensorRank sigma) 2) (not (tensorDimsEqual sigma)) then
+  if not (matIsSquareMatrix sigma) then
     error "Invalid argument: daecore.sigmaIndexReduce"
   else
     match solverPrimalProblem sigma with
@@ -374,45 +332,41 @@ let sigmaIndexReduce
     then
       if lti weight 0 then error "Singular matrix: daecore.sigmaIndexReduce"
       else
-        let ds = tcreate [n] (lam. 0) in
-        let cs = tcreate [n] (lam. 0) in
+        let ds = vecCreate n (lam. 0) in
+        let cs = vecCreate n (lam. 0) in
         solveDualProblem incidenceI ds cs;
         { cs = cs, ds = ds, incidenceI = incidenceI, incidenceJ = incidenceJ }
     else never
 
 utest (sigmaIndexReduce testSystems.pendulum.sigma).cs
-with testSystems.pendulum.cs using tensorEq eqi
+with testSystems.pendulum.cs using vecEq eqi
 
 utest (sigmaIndexReduce testSystems.pendulum.sigma).ds
-with testSystems.pendulum.ds using tensorEq eqi
+with testSystems.pendulum.ds using vecEq eqi
 
 utest (sigmaIndexReduce testSystems.pendulum.sigma).incidenceI
-with testSystems.pendulum.incidenceI using tensorEq eqi
+with testSystems.pendulum.incidenceI using vecEq eqi
 
 utest (sigmaIndexReduce testSystems.pendulum.sigma).incidenceJ
-with testSystems.pendulum.incidenceJ using tensorEq eqi
+with testSystems.pendulum.incidenceJ using vecEq eqi
 
 utest (sigmaIndexReduce testSystems.linsysOtter.sigma).cs
-with testSystems.linsysOtter.cs using tensorEq eqi
+with testSystems.linsysOtter.cs using vecEq eqi
 
 utest (sigmaIndexReduce testSystems.linsysOtter.sigma).ds
-with testSystems.linsysOtter.ds using tensorEq eqi
+with testSystems.linsysOtter.ds using vecEq eqi
 
 utest (sigmaIndexReduce testSystems.linsysOtter.sigma).incidenceI
-with testSystems.linsysOtter.incidenceI using tensorEq eqi
+with testSystems.linsysOtter.incidenceI using vecEq eqi
 
 utest (sigmaIndexReduce testSystems.linsysOtter.sigma).incidenceJ
-with testSystems.linsysOtter.incidenceJ using tensorEq eqi
+with testSystems.linsysOtter.incidenceJ using vecEq eqi
 
 
 -- Columns of `sigma` incident to row `i`.
 let sigmaAllIncident : Matrix Int -> Int -> [Int] =
   lam sigma. lam i.
-    map
-      head
-      (tensorFilteri
-        (lam. lam x. gti x sigmaNoEdge)
-        (tensorSliceExn sigma [i]))
+    vecFilteri (lam. lam x. gti x sigmaNoEdge) (matRow sigma i)
 
 utest
   let sigma = testSystems.pendulum.sigma in
@@ -420,36 +374,45 @@ utest
 with [[0, 2], [1, 2], [0, 1]]
 
 
-let inputOffsets : Matrix Int -> Vector Int -> [[Int]] -> Vector Int =
-lam sigma. lam cs. lam us.
+let inputOffsets : Vector Int -> [[Int]] -> Vector Int =
+lam cs. lam us.
   let nu =
     setSize (foldl setUnion (setEmpty subi) (map (setOfSeq subi) us))
   in
-  let uos = tcreate [nu] (lam idx. 0) in
+  let uos = vecCreate nu (lam idx. 0) in
   iteri
     (lam i. lam us.
       (iter
         (lam j.
-          tset uos [j] (maxi (tget cs [i]) (tget uos [j])))
+          vecSet uos j (maxi (vecGet cs i) (vecGet uos j)))
         us))
     us;
   uos
 
 utest
-  let us = daeInputs testSystems.pendulum.dae in
-  let sigma = testSystems.pendulum.sigma in
+  let us = testSystems.pendulum.dae.inputs in
   let cs = testSystems.pendulum.cs in
-  inputOffsets sigma cs us
+  inputOffsets cs us
 with testSystems.pendulum.es
-using tensorEq eqi
+using vecEq eqi
 
 utest
-  let us = daeInputs testSystems.linsysOtter.dae in
-  let sigma = testSystems.linsysOtter.sigma in
+  let us = testSystems.linsysOtter.dae.inputs in
   let cs = testSystems.linsysOtter.cs in
-  inputOffsets sigma cs us
+  inputOffsets cs us
 with testSystems.linsysOtter.es
-using tensorEq eqi
+using vecEq eqi
+
+-- Structure of `ds`.
+let structure : Vector Int -> [[IdOrd]] = lam ds.
+  vecFoldi
+    (lam acc. lam i. lam d.
+      let ios =
+        unfoldr (lam o. if gti o d then None () else Some ((i, o), succ o)) 0
+      in
+      snoc acc ios)
+    []
+    ds
 
 -----------------
 -- BLT SORTING --
@@ -457,17 +420,15 @@ using tensorEq eqi
 
 let mkDependencyGraph : Matrix Int -> Vector Int -> Digraph Int Int =
 lam sigma. lam incidenceJ.
-  let n = tensorSize incidenceJ in
+  let n = vecLength incidenceJ in
   let fs = create n (lam i. i) in
-  let g = digraphEmpty eqi eqi in
+  let g = digraphEmpty subi eqi in
   let g = foldl (lam g. lam f. digraphAddVertex f g) g fs in
-  tensorFoldi
-    (lam g. lam fv. lam x.
-      match fv with [f, v] then
-        let af = tget incidenceJ [v] in
-        if and (gti x sigmaNoEdge) (neqi af f) then digraphAddEdge af f x g
-        else g
-      else error "Invalid argument: daecore.mkDependencyGraph")
+  matFoldi
+    (lam g. lam f. lam v. lam x.
+      let af = vecGet incidenceJ v in
+      if and (gti x sigmaNoEdge) (neqi af f) then digraphAddEdge af f x g
+      else g)
     g
     sigma
 
@@ -493,7 +454,7 @@ with testSystems.linsysOtter.blocks using eqsetEqual (eqsetEqual eqi)
 -- Assigned variables in each BLT block (`incidenceJ`, `block`).
 let bltAssignedVars : Vector Int -> [[Int]] -> [[Int]] =
   lam incidenceJ. lam blocks.
-    map (map (lam eq. tget incidenceJ [eq])) blocks
+    map (map (lam eq. vecGet incidenceJ eq)) blocks
 
 utest
   let incidenceJ = testSystems.pendulum.incidenceJ in
@@ -557,7 +518,7 @@ with testSystems.linsysOtter.varsInBlock using eqSeq (eqsetEqual eqi)
 
 -- Variable `v` is algebraic
 let isAlgebraic = lam ds. lam lambdas. lam v.
-  eqi (addi (tget ds [v]) (tget lambdas [v])) 0
+  eqi (addi (vecGet ds v) (vecGet lambdas v)) 0
 
 -- Variable `v` is differential
 let isDifferential = lam ds. lam lambdas. lam v. not (isAlgebraic ds lambdas v)
@@ -573,7 +534,7 @@ let sortFindLambda
   } -> Vector Int =
   lam arg.
   -- Number of variables
-  let nvs = tensorSize arg.ds in
+  let nvs = vecLength arg.ds in
 
   -- Number of blocks
   let nblocks = length arg.blocks in
@@ -585,29 +546,23 @@ let sortFindLambda
   let assignedVars = bltAssignedVars arg.incidenceJ arg.blocks in
 
   -- BLT block assigned to each variable
-  let blockAssignedToVars =
-    tensorOfSeqExn tcreate [nvs] (bltAssigned assignedVars vs)
-  in
+  let blockAssignedToVars = vecOfSeq (bltAssigned assignedVars vs) in
 
-  let assignedVars =
-    tensorOfSeqExn tcreate [nblocks] assignedVars
-  in
+  let assignedVars = vecOfSeq assignedVars in
 
   -- Variables in each BLT block
-  let bltVars =
-    tensorOfSeqExn tcreate [nblocks] (bltVars arg.sigma arg.blocks)
-  in
+  let bltVars = vecOfSeq (bltVars arg.sigma arg.blocks) in
 
   -- Vector indicating if algebraic variable should be substituted with its
   -- derivative. A 0 means no and a 1 means yes.
-  let lambdas = tcreate [nvs] (lam. 0) in
+  let lambdas = vecCreate nvs (lam. 0) in
 
   let isAlgebraic = isAlgebraic arg.ds lambdas in
   let isDifferential = isDifferential arg.ds lambdas in
 
   -- Substitute `v` for its derivative if `v` is algebraic
   let maybeSubstitute =
-    lam v. if isAlgebraic v then tset lambdas [v] 1 else ()
+    lam v. if isAlgebraic v then vecSet lambdas v 1 else ()
   in
 
   -- Main Algorithm
@@ -615,9 +570,9 @@ let sortFindLambda
     match us with [] then ()
     else match us with [u] ++ us then
       if isAlgebraic u then
-        let block = tget blockAssignedToVars [u] in
-        let assignedVars = tget assignedVars [block] in
-        let blockVars = tget bltVars [block] in
+        let block = vecGet blockAssignedToVars u in
+        let assignedVars = vecGet assignedVars block in
+        let blockVars = vecGet bltVars block in
         if or
             (any isDifferential assignedVars)
             (any isDifferential blockVars)
@@ -651,7 +606,7 @@ utest
     incidenceJ = incidenceJ
   }
 with testSystems.pendulum.lambdas
-using tensorEq eqi
+using vecEq eqi
 
 utest
   let sigma = testSystems.linsysOtter.sigma in
@@ -665,53 +620,72 @@ utest
     incidenceJ = incidenceJ
   }
 with testSystems.linsysOtter.lambdas
-using tensorEq eqi
+using vecEq eqi
 
 
------------------------------
--- FIRST-ORDER FORMULATION --
------------------------------
+------------------------------------------
+-- INDEXING AND FIRST-ORDER FORMULATION --
+------------------------------------------
+
+let idxOffsets : Vector Int -> Vector Int =
+lam ofs.
+  let n = vecLength ofs in
+  let t = vecMapCopy (addi 1) ofs in
+  vecCumsimiInplace t;
+  let idxOfs = vecCreate n (lam. 0) in
+  vecBlit
+    (vecSub t 0 (pred n))
+    (vecSub idxOfs 1 (pred n));
+  idxOfs
+
+utest idxOffsets testSystems.pendulum.ds
+with vecOfSeq [0, 3, 6]
+using vecEq eqi
+
+utest idxOffsets testSystems.linsysOtter.ds
+with vecOfSeq [0, 3, 6, 9, 11, 12, 16, 20]
+using vecEq eqi
+
 
 -- The index offset of each variable in a first-order formulation
-let idxOffsets : Vector Int -> Vector Int =
+let idxOffsetsFirstOrder : Vector Int -> Vector Int =
   lam ofs.
-    let n = tensorSize ofs in
-    let t = tensorMapCopy (maxi 1) ofs in
-    tensorCumsumiInplace t;
-    let idxOfs = tensorCreateDense [n] (lam. 0) in
-    tensorMapExn
-      (lam x. x)
-      (tensorSubExn t 0 (subi n 1))
-      (tensorSubExn idxOfs 1 (subi n 1));
+    let n = vecLength ofs in
+    let t = vecMapCopy (maxi 1) ofs in
+    vecCumsimiInplace t;
+    let idxOfs = vecCreate n (lam. 0) in
+    vecBlit
+      (vecSub t 0 (pred n))
+      (vecSub idxOfs 1 (pred n));
     idxOfs
 
 utest
-  let ofs = idxOffsets (tcreate [0] (lam. 0)) in
-  tensorToSeqExn ofs
+  let ofs = idxOffsetsFirstOrder (vecCreate 0 (lam. 0)) in
+  vecToSeq ofs
 with []
 
-utest idxOffsets testSystems.pendulum.ds
+utest idxOffsetsFirstOrder testSystems.pendulum.ds
 with testSystems.pendulum.varIdxOffsets
-using tensorEq eqi
+using vecEq eqi
 
-utest idxOffsets testSystems.linsysOtter.ds
+utest idxOffsetsFirstOrder testSystems.linsysOtter.ds
 with testSystems.linsysOtter.varIdxOffsets
-using tensorEq eqi
+using vecEq eqi
 
 
 -- Indexes indicating alias equations of the first-order DAE
 let aliases : Vector Int -> [(Int, Int)] =
 lam ds.
-  let idxOffsets = idxOffsets ds in
-  let dxs = tensorFilteri (lam. lam d. gti d 0) ds in
+  let idxOffsets = idxOffsetsFirstOrder ds in
+  let idxs = vecFilteri (lam. lam d. gti d 0) ds in
   let f =
-    recursive let recur = lam a. lam d. lam idx.
-      if eqi (tget ds idx) d then a
-      else recur (snoc a (addi (tget idxOffsets idx) d)) (succ d) idx
+    recursive let recur = lam a. lam d. lam i.
+      if eqi (vecGet ds i) d then a
+      else recur (snoc a (addi (vecGet idxOffsets i) d)) (succ d) i
     in recur [] 0
   in
   let g = lam idxs. zip (tail idxs) (init idxs) in
-  join (map (compose g f) dxs)
+  join (map (compose g f) idxs)
 
 utest
   let ds = testSystems.pendulum.ds in
@@ -725,7 +699,7 @@ with [(1, 0), (3, 2), (5, 4), (9, 8), (10, 9), (12, 11), (13, 12)]
 
 
 let nVariables : Vector Int -> Int =
-  lam ofs. tensorFold (lam a. lam d. addi a (maxi 1 d)) 0 ofs
+  lam ofs. vecFold (lam a. lam d. addi a (maxi 1 d)) 0 ofs
 
 utest nVariables testSystems.pendulum.ds with 5
 utest nVariables testSystems.linsysOtter.ds with 15
@@ -761,25 +735,25 @@ let sortEquations
   let varsInEq = sigmaAllIncident arg.sigma in
   let isAlgebraic = isAlgebraic arg.ds arg.lambdas in
   let isDifferential = isDifferential arg.ds arg.lambdas in
-  let isDifferentiated = lam e. gti (tget arg.cs [e]) 0 in
+  let isDifferentiated = lam e. gti (vecGet arg.cs e) 0 in
 
-  let neqs = tensorSize arg.cs in
+  let neqs = vecLength arg.cs in
   let eqs = create neqs (lam e. e) in
   let nblocks = length arg.blocks in
 
   let assignedVars =
-    tensorOfSeqExn tcreate [nblocks] (bltAssignedVars arg.incidenceJ arg.blocks)
+    vecOfSeq (bltAssignedVars arg.incidenceJ arg.blocks)
   in
 
   let assignedEqs =
-    tensorOfSeqExn tcreate [neqs] (bltAssigned arg.blocks eqs)
+    vecOfSeq (bltAssigned arg.blocks eqs)
   in
 
   let eqs0d =
     filter
       (lam e.
-        let block = tget assignedEqs [e] in
-        let assignedVars = tget assignedVars [block] in
+        let block = vecGet assignedEqs e in
+        let assignedVars = vecGet assignedVars block in
         and (not (isDifferentiated e)) (all isDifferential assignedVars))
       eqs
   in
@@ -787,8 +761,8 @@ let sortEquations
   let eqs0a =
       filter
       (lam e.
-        let block = tget assignedEqs [e] in
-        let assignedVars = tget assignedVars [block] in
+        let block = vecGet assignedEqs e in
+        let assignedVars = vecGet assignedVars block in
         and (not (isDifferentiated e)) (all isAlgebraic assignedVars))
       eqs
   in
@@ -797,7 +771,7 @@ let sortEquations
 
   let eqsNc =
   foldl
-    (lam a. lam i. concat a (map (lam o. (i, o)) (range 1 (tget arg.cs [i]) 1)))
+    (lam a. lam i. concat a (map (lam o. (i, o)) (range 1 (vecGet arg.cs i) 1)))
     []
     (filter isDifferentiated eqs)
   in
@@ -832,7 +806,8 @@ with {
     (0, 1),
     (1, 1),
     (5, 1), (5, 2),
-    (6, 1), (6, 2) ]
+    (6, 1), (6, 2)
+  ]
 }
 
 
@@ -842,21 +817,19 @@ with {
 
 let offsetGet : Vector Int -> Vector a -> IdOrd -> a =
 lam offsets.
-  let idxOffsets = idxOffsets offsets in
   lam y. lam v.
     let i = idOrdId v in
     let o = idOrdOrd v in
-    let ofs = tget idxOffsets [i] in
-    tget y [addi ofs o]
+    let ofs = vecGet offsets i in
+    vecGet y (addi ofs o)
 
 let offsetSet : Vector Int -> Vector a -> IdOrd -> a -> () =
 lam offsets.
-  let idxOffsets = idxOffsets offsets in
   lam y. lam v. lam val.
     let i = idOrdId v in
     let o = idOrdOrd v in
-    let ofs = tget idxOffsets [i] in
-    tset y [addi ofs o] val
+    let ofs = vecGet offsets i in
+    vecSet y (addi ofs o) val
 
 let offsetGetYYPLambdas
   : { ds : Vector Int, lambdas : Vector Int }
@@ -865,19 +838,19 @@ let offsetGetYYPLambdas
   -> IdOrd
   -> a =
 lam arg.
-  let idxOffsets = idxOffsets arg.ds in
+  let idxOffsets = idxOffsetsFirstOrder arg.ds in
   lam y. lam yp. lam v.
     let i = idOrdId v in
     let o = idOrdOrd v in
-    let l = tget arg.lambdas [i] in
+    let l = vecGet arg.lambdas i in
     let o = addi o l in
-    let ofs = tget idxOffsets [i] in
-    let dmax = tget arg.ds [i] in
+    let ofs = vecGet idxOffsets i in
+    let dmax = vecGet arg.ds i in
 
     if or (lti o dmax) (eqi o 0) then
-      tget y [addi ofs o]
+      vecGet y (addi ofs o)
     else if eqi (subi o l) dmax then
-      tget yp [addi ofs (pred o)]
+      vecGet yp (addi ofs (pred o))
     else
       error "Unknown variable: daecore.offsetGetYYPLambdas"
 
@@ -886,8 +859,8 @@ utest
     ds = testSystems.pendulum.ds,
     lambdas = testSystems.pendulum.lambdas
   } in
-  let y = tensorRangei tcreate [5] 0 in
-  let yp = tensorRangei tcreate [5] 5 in
+  let y = vecOfSeq (range 0 6 1) in
+  let yp = vecOfSeq (range 5 10 1) in
   mapi
     (lam i. map (lam o. offsetGetYYPLambdas arg y yp (i, o)))
     [[0, 1, 2], [0, 1, 2], [0]]
@@ -898,8 +871,8 @@ utest
     ds = testSystems.linsysOtter.ds,
     lambdas = testSystems.linsysOtter.lambdas
   } in
-  let y = tensorRangei tcreate [15] 0 in
-  let yp = tensorRangei tcreate [15] 15 in
+  let y = vecOfSeq (range 0 16 1) in
+  let yp = vecOfSeq (range 15 31 1) in
   mapi
     (lam i. map (lam o. offsetGetYYPLambdas arg y yp (i, o)))
     [
@@ -935,24 +908,24 @@ let offsetSetYYPLambdas
   -> () =
 lam arg.
   let aliases = mapFromSeq subi (aliases arg.ds) in
-  let idxOffsets = idxOffsets arg.ds in
+  let idxOffsets = idxOffsetsFirstOrder arg.ds in
   lam y. lam yp. lam v. lam val.
     let i = idOrdId v in
     let o = idOrdOrd v in
-    let l = tget arg.lambdas [i] in
+    let l = vecGet arg.lambdas i in
     let o = addi o l in
-    let ofs = tget idxOffsets [i] in
-    let dmax = tget arg.ds [i] in
+    let ofs = vecGet idxOffsets i in
+    let dmax = vecGet arg.ds i in
     if or (lti o dmax) (eqi o 0) then
       let i = addi ofs o in
-      tset y [i] val;
+      vecSet y i val;
       let j = mapLookup i aliases in
       match j with Some j then
-        tset yp [j] val
+        vecSet yp j val
       else match j with None _ then ()
       else never
     else if eqi (subi o l) dmax then
-      tset yp [addi ofs (pred o)] val
+      vecSet yp (addi ofs (pred o)) val
     else
       error "Unknown variable: daecore.offsetSetYYPLambdas"
 
@@ -961,13 +934,13 @@ utest
     ds = testSystems.pendulum.ds,
     lambdas = testSystems.pendulum.lambdas
   } in
-  let y = tcreate [5] (lam. (negi 1)) in
-  let yp = tcreate [5] (lam. (negi 1)) in
+  let y = vecCreate 5 (lam. (negi 1)) in
+  let yp = vecCreate 5 (lam. (negi 1)) in
   let offsetSetYYPLambdas = offsetSetYYPLambdas arg y yp in
   iteri
     (lam i. map (lam dv : (Int, Int). offsetSetYYPLambdas (i, dv.0) dv.1))
     [[(0, 0), (1, 1), (2, 2)], [(0, 3), (1, 4), (2, 5)], [(0, 6)]];
-  [tensorToSeqExn y, tensorToSeqExn yp]
+  [vecToSeq y, vecToSeq yp]
 with [[0, 1, 3, 4, negi 1], [1, 2, 4, 5, 6]]
 
 
@@ -979,7 +952,7 @@ let offsetGetYYP
   -> a =
 lam ds. offsetGetYYPLambdas {
   ds = ds,
-  lambdas = tcreate [tensorSize ds] (lam. 0)
+  lambdas = vecCreate (vecLength ds) (lam. 0)
 }
 
 let offsetSetYYP
@@ -990,7 +963,7 @@ let offsetSetYYP
   -> a =
 lam ds. offsetSetYYPLambdas {
   ds = ds,
-  lambdas = tcreate [tensorSize ds] (lam. 0)
+  lambdas = vecCreate (vecLength ds) (lam. 0)
 }
 
 
@@ -999,7 +972,7 @@ lam ds. offsetSetYYPLambdas {
 --------------------------
 
 type FirstOrderResidual = {
-    res
+    resf
       : DualNum
       -> Vector DualNum
       -> Vector DualNum
@@ -1008,40 +981,41 @@ type FirstOrderResidual = {
       -> Vector DualNum
       -> (),
 
-    ds : Vector Int,
-    es : Vector Int,
-    ny : Int
+    structureY : [IdOrd],
+    structureYP : [IdOrd],
+    structureU : [IdOrd],
+    isdiff : [Bool]
 }
 
 -- Vector indicating which dependent variables in the first-order system are
 -- differential.
 let isdiffLambdas : Vector Int -> Vector Int -> [Bool] =
  lam lambdas. lam ds.
-  let f = lam idx. lam d.
+  let f = lam i. lam d.
     if eqi d 0 then
-      if eqi (tget lambdas idx) 0 then [false] else [true]
+      if eqi (vecGet lambdas i) 0 then [false] else [true]
     else create d (lam. true)
   in
-  join (tensorFoldi (lam acc. lam idx. lam d. snoc acc (f idx d)) [] ds)
+  join (vecFoldi (lam acc. lam i. lam d. snoc acc (f i d)) [] ds)
 
 let isdiff : Vector Int -> [Bool] =
-  lam ds. isdiffLambdas (tcreate [tensorSize ds] (lam. 0)) ds
+  lam ds. isdiffLambdas (vecCreate (vecLength ds) (lam. 0)) ds
 
 utest
-  let ds = tensorOfSeqExn tcreate [3] [2, 2, 0] in
-  let lambdas = tensorOfSeqExn tcreate [3] [0, 0, 1] in
+  let ds = vecOfSeq [2, 2, 0] in
+  let lambdas = vecOfSeq [0, 0, 1] in
   isdiffLambdas lambdas ds
 with [true, true, true, true, true]
 
 utest
-  let ds = tensorOfSeqExn tcreate [8] [2, 2, 2, 1, 0, 3, 3, 0] in
-  let lambdas = tensorOfSeqExn tcreate [8] [0, 0, 0, 0, 1, 0, 0, 0] in
+  let ds = vecOfSeq [2, 2, 2, 1, 0, 3, 3, 0] in
+  let lambdas = vecOfSeq [0, 0, 0, 0, 1, 0, 0, 0] in
   isdiffLambdas lambdas ds
 with snoc (create 14 (lam. true)) false using eqSeq eqBool
 
 utest
-  let ds = tensorOfSeqExn tcreate [3] [2, 2, 0] in
-  let lambdas = tensorOfSeqExn tcreate [3] [0, 0, 1] in
+  let ds = vecOfSeq [2, 2, 0] in
+  let lambdas = vecOfSeq [0, 0, 1] in
   isdiff ds
 with [true, true, true, true, false]
 
@@ -1051,63 +1025,55 @@ let v = lam get.
     lam t. dualnumLift1 (lam. get (i, d)) (recur (succ d) i) t
   in recur 0
 
-
--- Formulate residual function for index-reduced, non-stabilized DAE.
+-- Formulate residual function for naive index-reduced, non-stabilized DAE.
 let residual
   : {
     cs : Vector Int,
     ds : Vector Int,
     es : Vector Int
   }
-  -> [
-    Vector (DualNum -> DualNum) ->
-    Vector (DualNum -> DualNum) ->
-    Vector DualNum ->
-    DualNum ->
-    DualNum
-  ]
+  -> Residual
   -> FirstOrderResidual
   = lam arg. lam fs.
   let aliases = aliases arg.ds in
-  let nx = tensorSize arg.ds in
-  let nu = tensorSize arg.es in
-  let xs = tcreate [nx] (lam. lam. num 0.) in
-  let us = tcreate [nu] (lam. lam. num 0.) in
-  let xis = create nx (lam i. i) in
-  let uis = create nu (lam i. i) in
+  let nx = vecLength arg.ds in
+  let nu = vecLength arg.es in
   let stateGet = offsetGetYYP arg.ds in
-  let res = lam t. lam y. lam yp. lam u. lam th. lam r.
-    let stateGet = stateGet y yp in
-    let inputGet = lam x : IdOrd. tget (tget u [idOrdId x]) [idOrdOrd x] in
-
-    -- Define x_i(t)
-    let x = v stateGet in
-
-    -- Define u_i(t)
-    let u = v inputGet in
-
-    -- Populate xs with x_i(t) for i = 0..nx-1
-    iter (lam i. tset xs [i] (x i)) xis;
-
-    -- Populate us with u_i(t) for i = 0..nu-1
-    iter (lam i. tset us [i] (u i)) uis;
-
-    -- Compute index-reduced residual
-    iteri (lam i. lam f. tset r [i] (nder (tget arg.cs [i]) (f xs us th) t)) fs;
-
-    -- Compute alias equations
-    iteri
-      (lam i. lam a : (Int, Int).
-        tset r [addi i nx] (subn (tget y [a.0]) (tget yp [a.1])))
-      aliases
-
+  let inputGet = offsetGet (idxOffsets arg.es) in
+  let resf = lam th. lam u.
+    -- define theta_i
+    let th = vecGet th in
+    -- define u(t)_i
+    let u = v (inputGet u) in
+    lam t. lam y. lam yp. lam r.
+      -- define x(t)_i
+      let x = v (stateGet y yp) in
+      let fs = fs th u x in
+      -- compute index-reduced residual
+      iteri (lam i. lam f. vecSet r i (nder (vecGet arg.cs i) f t)) fs;
+      -- compute alias equations
+      iteri
+        (lam i. lam a : (Int, Int).
+          match a with (j, k) then
+            vecSet r (addi i nx) (subn (vecGet y j) (vecGet yp k))
+          else never)
+        aliases;
+      ()
   in
-
-  let ds = tensorCopy arg.ds in
-  let es = tensorCopy arg.es in
-  let ny = nVariables arg.ds in
-
-  { res = res, ds = ds, es = es, ny = ny }
+  let structureY =
+    join
+      (map (lam vs. if eqi (length vs) 1 then vs else init vs) (structure arg.ds))
+  in
+  let structureYP = map idOrdDer structureY in
+  let structureU = join (structure arg.es) in
+  let isdiff = isdiff arg.ds in
+  {
+    resf = resf,
+    structureY = structureY,
+    structureYP = structureYP,
+    structureU = structureU,
+    isdiff = isdiff
+  }
 
 let x0 = 1.
 let dx0 = 2.
@@ -1124,18 +1090,16 @@ utest
     es = testSystems.pendulum.es
   }
   in
-  let fs = daeResiduals testSystems.pendulum.dae in
+  let fs = testSystems.pendulum.dae.residual in
   let res : FirstOrderResidual = residual arg fs in
   let t = num 0. in
-  let y = tensorOfSeqExn tcreate [5] (map num [x0, dx0, x1, dx1, x2]) in
-  let yp =
-    tensorOfSeqExn tcreate [5] (map num [dx0, ddx0, dx1, ddx1, negf 10000.])
-  in
-  let u = tcreate [2] (lam. tcreate [1] (lam. num 0.)) in
-  let r = tcreate [5] (lam. num 0.) in
-  let th = tcreate [3] (lam. num 1.) in
-  res.res t y yp u th r;
-  map dualnumUnpackNum (tensorToSeqExn r)
+  let y = vecOfSeq (map num [x0, dx0, x1, dx1, x2]) in
+  let yp = vecOfSeq (map num [dx0, ddx0, dx1, ddx1, negf 10000.]) in
+  let u = vecCreate 2 (lam. num 0.) in
+  let r = vecCreate 5 (lam. num 0.) in
+  let th = vecCreate 3 (lam. num 1.) in
+  res.resf th u t y yp r;
+  map dualnumUnpackNum (vecToSeq r)
 with [
   subf ddx0 (mulf x0 x2),
   addf (subf ddx1 (mulf x1 x2)) 1.,
@@ -1145,6 +1109,23 @@ with [
   0.,
   0.
 ]
+
+utest
+  let arg = {
+    cs = testSystems.pendulum.cs,
+    ds = testSystems.pendulum.ds,
+    es = testSystems.pendulum.es
+  }
+  in
+  let fs = testSystems.pendulum.dae.residual in
+  let res : FirstOrderResidual = residual arg fs in
+  (res.structureY, res.structureYP, res.structureU, res.isdiff)
+with (
+  [(0, 0), (0, 1), (1, 0), (1, 1), (2, 0)],
+  [(0, 1), (0, 2), (1, 1), (1, 2), (2, 1)],
+  [(0, 0), (1, 0)],
+  [true, true, true, true, false]
+)
 
 -- Formulate residual function for index-reduced, stabilized DAE.
 let residualStabilized
@@ -1157,33 +1138,23 @@ let residualStabilized
     lambdas : Vector Int,
     us : [[Int]]
   }
-  -> [
-    Vector (DualNum -> DualNum) ->
-    Vector (DualNum -> DualNum) ->
-    Vector DualNum ->
-    DualNum ->
-    DualNum
-  ]
+  -> Residual
   -> FirstOrderResidual
   = lam arg. lam fs.
-
-  -- Compute input offsets
+  -- compute input offsets
   let es =
     inputOffsets
-      arg.sigma
-      (tensorMapCopy (lam c. mini 0 (subi c 1)) arg.cs)
+      (vecMapCopy (lam c. mini 0 (subi c 1)) arg.cs)
       arg.us
   in
-
-  -- Getters
-  let stateGetY = offsetGet arg.ds in
-  let inputGet = lam u. lam x : IdOrd. tget (tget u [idOrdId x]) [idOrdOrd x] in
+  -- getters
+  let stateGetY = offsetGet (idxOffsetsFirstOrder arg.ds) in
+  let inputGet = offsetGet (idxOffsets es) in
   let stateGetYYP = offsetGetYYPLambdas {
     ds = arg.ds,
     lambdas = arg.lambdas
   } in
-
-  -- Sort equations
+  -- sort equations
   let se = sortEquations {
     sigma = arg.sigma,
     cs = arg.cs,
@@ -1192,126 +1163,106 @@ let residualStabilized
     blocks = arg.blocks,
     lambdas = arg.lambdas
   } in
-
-  -- Sort residual functions
-
-  -- Non-differentiated differential residual
-  let f0d = map (lam i. get fs i) se.eqs0d in
-
-  -- Algebraic residual
-  let f0a = map (lam i. get fs i) se.eqs0a in
-
-  -- Non-differentiated constraint residual
-  let f0c = map (lam i. get fs i) se.eqs0c in
-
-  -- Differentiated constraint residual, except at the highest differentiation
-  -- order
-  let fNc =
-    map (lam e : IdOrd. (get fs (idOrdId e), idOrdOrd e)) se.eqsNc
-  in
-
-  -- Compute problem sizes
-  let nf0d = length f0d in
-  let nf0a = length f0a in
-  let nf0c = length f0c in
-  let nfNc = length fNc in
+  -- compute problem sizes
+  let nf0d = length se.eqs0d in
+  let nf0a = length se.eqs0a in
+  let nf0c = length se.eqs0c in
+  let nfNc = length se.eqsNc in
   let nf = foldl addi 0 [nf0d, nf0a, nf0c, nfNc] in
-  let nx = tensorSize arg.ds in
-  let nu = tensorSize es in
-
+  let nx = vecLength arg.ds in
+  let nu = vecLength es in
   -- number of variables in first-order system
   let nvars = nVariables arg.ds in
-
-  -- Alias residual
+  -- alias residual
   let aliases = aliases arg.ds in
   let naliases = length aliases in
-
   -- number of dummy variables
   let nmu = nfNc in
-
-  -- Pre-allocate intermediate data-structures
-  let xis = create nx (lam i. i) in
-  let uis = create nu (lam i. i) in
-  let xs = tcreate [nx] (lam. lam. num 0.) in
-  let us = tcreate [nu] (lam. lam. num 0.) in
-  let g_i = tcreate [nfNc] (lam. num 0.) in
-
-  -- Differentiated constraint residual
-  let resNc = lam t. lam y. lam u. lam th. lam r.
-    let stateGet = stateGetY y in
-    let inputGet = inputGet u in
-
-    -- Define x_i(t)
-    let x = v stateGet in
-
-    -- Define u_i(t)
-    let u = v inputGet in
-
-    -- Populate xs with x_i(t) for i = 0..nx-1
-    iter (lam i. tset xs [i] (x i)) xis;
-
-    -- Populate us with u_i(t) for i = 0..nu-1
-    iter (lam i. tset us [i] (u i)) uis;
-
-    iteri
-      (lam i. lam fo : (Residual, Int). tset r [i] (nder fo.1 (fo.0 xs us th) t))
-      fNc
-  in
-
-  let res = lam t. lam y. lam yp. lam u. lam th. lam r.
-    let stateGet = stateGetYYP y yp in
-    let inputGet = inputGet u in
-
-    -- Define x_i(t)
-    let x = v stateGet in
-
-    -- Define u_i(t)
-    let u = v inputGet in
-
-    -- Populate xs with x_i(t) for i = 0..nx-1
-    iter (lam i. tset xs [i] (x i)) xis;
-
-    -- Populate us with u_i(t) for i = 0..nu-1
-    iter (lam i. tset us [i] (u i)) uis;
-
-    -- Compute non-differentiated differential residual
-    iteri (lam i. lam f. tset r [i] (f xs us th t)) f0d;
-
-    -- Compute algebraic residual
+  let resf = lam th. lam u. lam t. lam y. lam yp. lam r.
+    -- pre-allocate intermediate data-structures
+    let g_i = vecCreate nfNc (lam. num 0.) in
+    -- define theta_i
+    let th = vecGet th in
+    -- define u(t)_i
+    let u = v (inputGet u) in
+    -- differentiated constraint residual
+    let resNc = lam y. lam r.
+      let stateGet = stateGetY y in
+      -- define x(t)_i
+      let x = v stateGet in
+      -- differentiated constraint residual, except at the highest
+      -- differentiation order
+      let fs = fs th u x in
+      let fNc =
+        map (lam e : IdOrd. (get fs (idOrdId e), idOrdOrd e)) se.eqsNc
+      in
+      iteri
+        (lam i. lam fo : (DualNum -> DualNum, Int).
+          match fo with (f, n) then vecSet r i (nder n f t)
+          else never)
+        fNc
+    in
+    -- define x(t)_i
+    let x = v (stateGetYYP y yp) in
+    let fs = fs th u x in
+    -- non-differentiated differential residual
+    let f0d = map (lam i. get fs i) se.eqs0d in
+    -- algebraic residual
+    let f0a = map (lam i. get fs i) se.eqs0a in
+    -- non-differentiated constraint residual
+    let f0c = map (lam i. get fs i) se.eqs0c in
+    -- compute non-differentiated differential residual
+    iteri (lam i. lam f. vecSet r i (f t)) f0d;
+    -- compute algebraic residual
     let ofs = nf0d in
-    iteri (lam i. lam f. tset r [addi i ofs] (f xs us th t)) f0a;
-
-    -- Compute non-differentiated constraint residual
+    iteri (lam i. lam f. vecSet r (addi i ofs) (f t)) f0a;
+    -- compute non-differentiated constraint residual
     let ofs = addi ofs nf0a in
-    iteri (lam i. lam f. tset r [addi i ofs] (f xs us th t)) f0c;
-
-    -- Compute differentiated constraint residual
+    iteri (lam i. lam f. vecSet r (addi i ofs) (f t)) f0c;
+    -- compute differentiated constraint residual
     let ofs = addi ofs nf0c in
-    resNc t y u th (tensorSubExn r ofs nfNc);
-
-    -- Compute stabilized alias residual
+    resNc y (vecSub r ofs nfNc);
+    -- compute stabilized alias residual
     iteri
       (lam i. lam a : (Int, Int).
-        jaci (lam y. resNc t y u th) a.0 y g_i;
-        tensorMapiInplace
-          (lam idx. muln (tget yp [addi nvars (head idx)]))
-          g_i;
-        let alias = subn (tget y [a.0]) (tget yp [a.1]) in
-        let corr = tensorFold addn (num 0.) g_i in
-        tset r [addi nf i] (addn alias corr))
+        match a with (j, k) then
+          jaci (lam y. resNc y) j y g_i;
+          vecMapiInplace (lam i. muln (vecGet yp (addi nvars i))) g_i;
+          let alias = subn (vecGet y j) (vecGet yp k) in
+          let corr = vecFold addn (num 0.) g_i in
+          vecSet r (addi nf i) (addn alias corr)
+        else never)
       aliases;
-
     ()
   in
-
+  let structureY =
+    join
+      (mapi
+        (lam i. lam vs.
+          if eqi (length vs) 1 then
+            let n = vecGet arg.lambdas i in
+            map (idOrdIntN n) vs
+          else init vs)
+        (structure arg.ds))
+  in
+  let structureMu = map (lam i. (i, negi 1)) (range nx (addi nx nmu) 1) in
+  let structureY = concat structureY structureMu in
+  let structureYP = map idOrdDer structureY in
+  let structureU = join (structure es) in
   -- Update variable offset vector
-  let nds = tensorSize arg.ds in
-  let ds = tcreate [addi nds nmu] (lam. 1) in
-  tensorIteri
-    (lam idx. lam d. tset ds idx (addi d (tget arg.lambdas idx)))
+  let nds = vecLength arg.ds in
+  let ds = vecCreate (addi nds nmu) (lam. 1) in
+  vecIteri
+    (lam i. lam d. vecSet ds i (addi d (vecGet arg.lambdas i)))
     arg.ds;
-
-  { res = res, ds = ds, es = es, ny = addi nvars nmu }
+  let isdiff = isdiffLambdas arg.lambdas ds in
+  {
+    resf = resf,
+    structureY = structureY,
+    structureYP = structureYP,
+    structureU = structureU,
+    isdiff = isdiff
+  }
 
 
 let x0 = 1.
@@ -1331,22 +1282,18 @@ utest
     incidenceJ = testSystems.pendulum.incidenceJ,
     lambdas = testSystems.pendulum.lambdas,
     blocks = testSystems.pendulum.blocks,
-    us = daeInputs testSystems.pendulum.dae
+    us = testSystems.pendulum.dae.inputs
   } in
-  let fs = daeResiduals testSystems.pendulum.dae in
+  let fs = testSystems.pendulum.dae.residual in
   let res : FirstOrderResidual = residualStabilized arg fs in
   let t = num 0. in
-  let y =
-    tensorOfSeqExn tcreate [6] (map num [x0, dx0, x1, dx1, negf 10000., 0.])
-  in
-  let yp =
-    tensorOfSeqExn tcreate [6] (map num [dx0, ddx0, dx1, ddx1, x2, mu0])
-  in
-  let u = tcreate [2] (lam. tcreate [1] (lam. num 0.)) in
-  let r = tcreate [6] (lam. num 0.) in
-  let th = tcreate [3] (lam. num 1.) in
-  res.res t y yp u th r;
-  map dualnumUnpackNum (tensorToSeqExn r)
+  let y = vecOfSeq (map num [x0, dx0, x1, dx1, negf 10000., 0.]) in
+  let yp = vecOfSeq (map num [dx0, ddx0, dx1, ddx1, x2, mu0]) in
+  let u = vecCreate 2 (lam. num 0.) in
+  let r = vecCreate 6 (lam. num 0.) in
+  let th = vecCreate 3 (lam. num 1.) in
+  res.resf th u t y yp r;
+  map dualnumUnpackNum (vecToSeq r)
 with [
   subf ddx0 (mulf x0 x2),
   addf (subf ddx1 (mulf x1 x2)) 1.,
@@ -1358,220 +1305,316 @@ with [
   mulf mu0 (mulf 2. x1)
 ]
 
+utest
+  let arg = {
+    sigma = testSystems.pendulum.sigma,
+    cs = testSystems.pendulum.cs,
+    ds = testSystems.pendulum.ds,
+    incidenceJ = testSystems.pendulum.incidenceJ,
+    lambdas = testSystems.pendulum.lambdas,
+    blocks = testSystems.pendulum.blocks,
+    us = testSystems.pendulum.dae.inputs
+  } in
+  let fs = testSystems.pendulum.dae.residual in
+  let res : FirstOrderResidual = residualStabilized arg fs in
+  (res.structureY, res.structureYP, res.structureU, res.isdiff)
+with (
+  [(0, 0), (0, 1), (1, 0), (1, 1), (2, negi 1), (3, negi 1)],
+  [(0, 1), (0, 2), (1, 1), (1, 2), (2, 0), (3, 0)],
+  [(0, 0), (1, 0)],
+  [true, true, true, true, true, true]
+)
+
+---------------------------
+-- OBJECTIVE FORMULATION --
+---------------------------
+
+let offsetToStructure = lam ofs.
+  vecFoldi
+    (lam acc. lam i. lam x.
+      let os =
+        unfoldr (lam o. if gti o x then None () else Some ((i, o), succ o)) 0
+      in
+      concat acc os)
+    []
+    ofs
+
+utest
+  let cs = testSystems.pendulum.cs in
+  offsetToStructure cs
+with [(0, 0), (1, 0), (2, 0), (2, 1), (2, 2)]
+
+utest
+  let ds = testSystems.pendulum.ds in
+  let sget = offsetGet (idxOffsets ds) in
+  let x = vecOfSeq (range 0 7 1) in
+  map (sget x) [(0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2), (2, 0)]
+with (range 0 7 1) using eqSeq eqi
+
+let objective =
+lam arg : { fs : Residual, cs : Vector Int, ds : Vector Int, es : Vector Int }.
+  let idords = offsetToStructure arg.cs in
+  let stateGet = offsetGet (idxOffsets arg.ds) in
+  let inputGet = offsetGet (idxOffsets arg.es) in
+  lam th. lam u. lam t. lam x.
+    -- define theta_i
+    let th = vecGet th in
+    -- define u(t)_i
+    let u = v (inputGet u) in
+    -- define x(t)_i
+    let x = v (stateGet x) in
+    -- compute objective
+    let fs = arg.fs th u x in
+    let fs =
+      map (lam io : Idords. nder (idOrdOrd io) (get fs (idOrdId io)) t) idords
+    in
+    foldl (lam obj. lam f. addn obj (muln f f)) (num 0.) fs
+
+let constraintFun =
+lam arg : { g : ConstraintFun, ds : Vector Int, es : Vector Int }.
+  let stateGet = offsetGet (idxOffsets arg.ds) in
+  let inputGet = offsetGet (idxOffsets arg.es) in
+  lam th. lam u. lam t. lam x. lam g.
+    -- define theta_i
+    let th = vecGet th in
+    -- define u(t)_i
+    let u = v (inputGet u) in
+    -- define x(t)_i
+    let x = v (stateGet x) in
+    arg.g th u t x g;
+    ()
+
 ----------------------
 -- MAIN ENTRY POINT --
 ----------------------
 
-type DaecoreResidual = {
+type DaecoreIVP = {
   -- Residual function f(t, y, yp, u, r), where r stores the result of the
   -- residual.
-  res
-  : DualNum
-  -> Vector DualNum
-  -> Vector DualNum
-  -> Vector (Vector DualNum)
-  -> Vector DualNum
-  -> Vector DualNum
+  resf
+  : DualNum                     -- free variable t
+  -> Vector DualNum             -- parameter vector theta
+  -> Vector DualNum             -- input vector u
+  -> Vector DualNum             -- state vector y
+  -> Vector DualNum             -- vector of first derivatives of y w.r.t. t
+  -> Vector DualNum             -- vector to store the value of the residual
   -> (),
 
-  -- Getter for the state y, yp.
-  stateGet : Vector a -> Vector a -> IdOrd -> a,
+  -- Structure of y, associates variables of the original problem to y.
+  structureY : [IdOrd],
 
-  -- Setter for the state y, yp.
-  stateSet : Vector a -> Vector a -> IdOrd -> a -> (),
+  -- Structure of y', associates variables of the original problem to y'.
+  structureYP : [IdOrd],
 
-  -- Variable offset
-  ds : Vector Int,
+  -- Struture of u, inputs may appear differentiated in the index-reduced
+  -- problem.
+  structureU : [IdOrd],
 
-  -- Input offset
-  es : Vector Int,
+  -- Variables in y appearing differentiated in the residual.
+  isdiff : [Bool],
 
-  -- Size of residual
-  ny : Int
+  -- Ojbjective function
+  objf
+  : DualNum                     -- free variable t
+  -> Vector DualNum             -- parameter vector theta
+  -> Vector DualNum             -- input vector u
+  -> Vector DualNum             -- state vector x
+  -> DualNum,
+
+  -- Constraint function
+  g
+  : Vector DualNum              -- parameter vector theta
+  -> Vector DualNum             -- input vector u
+  -> DualNum                    -- free variable t
+  -> Vector DualNum             -- state vector x
+  -> Vector DualNum             -- vector to store the result of evaluation
+  -> (),
+
+  -- Structure of x, associates variables of the original problem to x.
+  structureX : [IdOrd]
 }
 
 -- Non-stabilized low-index residual
-let daecoreResidual : DAE -> DaecoreResidual = lam dae.
-  if not (daeConsistent dae) then
-    error "Inconsistent DAE: daecore.daecoreResidual"
-  else
-    let fs = daeResiduals dae in
-    let vs = daeVars dae in
-    let us = daeInputs dae in
-
-    let sigma = sigmaMatrix vs in
-    match sigmaIndexReduce sigma with
-      { cs = cs, ds = ds, incidenceJ = incidenceJ }
-    then
-      let es = inputOffsets sigma cs us in
-      let stateGet = offsetGetYYP ds in
-      let stateSet = offsetSetYYP ds in
-
-      let res : FirstOrderResidual =
-        residual { cs = cs, ds = ds, es = es } fs
-      in
-
-      {
-        res = res.res,
-        stateGet = stateGet,
-        stateSet = stateSet,
-        ds = res.ds,
-        es = res.es,
-        ny = res.ny
-      }
-    else never
+let daecoreIVP : DAE -> ConstraintFun -> DaecoreIVP
+= lam dae. lam g.
+  let fs = dae.residual in
+  let vs = dae.variables in
+  let us = dae.inputs in
+  let sigma = sigmaMatrix vs in
+  match sigmaIndexReduce sigma with
+    { cs = cs, ds = ds, incidenceJ = incidenceJ }
+  then
+    let es = inputOffsets cs us in
+    let res : FirstOrderResidual =
+      residual { cs = cs, ds = ds, es = es } fs
+    in
+    let objf = objective { fs = fs, cs = cs, ds = ds, es = es } in
+    let g = constraintFun { g = g, ds = ds, es = es } in
+    let structureX = offsetToStructure ds in
+    {
+      resf = res.resf,
+      structureY = res.structureY,
+      structureYP = res.structureYP,
+      structureU = res.structureU,
+      isdiff = res.isdiff,
+      objf = objf,
+      g = g,
+      structureX = structureX
+    }
+  else never
 
 utest
-  let res = daecoreResidual testSystems.pendulum.dae in
-  let y = tensorOfSeqExn tcreate [5] (map num [1., 0., 0., 0., 0.]) in
-  let yp = tensorOfSeqExn tcreate [5] (map num [0., 0., 0., negf 1., 0.]) in
-  let u = tcreate [2] (lam. tcreate [1] (lam. num 0.)) in
-  let r = tcreate [5] (lam. num 0.) in
+  let ivp = daecoreIVP testSystems.pendulum.dae testSystems.pendulum.g in
+  let y = vecOfSeq (map num [1., 0., 0., 0., 0.]) in
+  let yp = vecOfSeq (map num [0., 0., 0., negf 1., 0.]) in
+  let th = vecCreate 3 (lam. num 1.) in
+  let u = vecCreate 2 (lam. num 0.) in
+  let r = vecCreate 5 (lam. num 0.) in
   let t = num 0. in
-  res.res t y yp u r;
-  tensorToSeqExn r
+  ivp.resf th u t y yp r;
+  vecToSeq r
 with create 5 (lam. num 0.) using eqSeq (dualnumEq eqf)
 
 utest
-  let res = daecoreResidual testSystems.pendulum.dae in
-  let y = tcreate [5] (lam. 0) in
-  let yp = tcreate [5] (lam. 0) in
-  res.stateSet y yp (0, 0) 1;
-  res.stateSet y yp (0, 1) 2;
-  res.stateSet y yp (0, 2) 3;
-  res.stateSet y yp (1, 0) 4;
-  res.stateSet y yp (1, 1) 5;
-  res.stateSet y yp (1, 2) 6;
-  res.stateSet y yp (2, 0) 7;
-  (tensorToSeqExn y, tensorToSeqExn yp)
-with ([1, 2, 4, 5, 7], [2, 3, 5, 6, 0])
+  let ivp = daecoreIVP testSystems.pendulum.dae testSystems.pendulum.g in
+  let x =
+    vecOfSeq
+      (map num [
+        0.707107,
+        0.,
+        negf 0.5,
+        negf 0.707107,
+        0.,
+        negf 0.5,
+        negf 0.707107]
+      )
+  in
+  let th = vecCreate 3 (lam. num 1.) in
+  let u = vecCreate 2 (lam. num 0.) in
+  let t = num 0. in
+  _unpack (ivp.objf th u t x)
+with 0. using eqfApprox 1.e-10
 
 utest
-  let res = daecoreResidual testSystems.pendulum.dae in
-  let y = tcreate [5] (lam idx. addi 1 (head idx)) in
-  let yp = tcreate [5] (lam idx. addi 6 (head idx)) in
-  [
-    res.stateGet y yp (0, 0),
-    res.stateGet y yp (0, 1),
-    res.stateGet y yp (0, 2),
-    res.stateGet y yp (1, 0),
-    res.stateGet y yp (1, 1),
-    res.stateGet y yp (1, 2),
-    res.stateGet y yp (2, 0)
-  ]
-with [1, 2, 7, 3, 4, 9, 5]
+  let ivp = daecoreIVP testSystems.pendulum.dae testSystems.pendulum.g in
+  let x =
+    vecOfSeq
+      (map num [
+        0.707107,
+        0.,
+        negf 0.5,
+        negf 0.707107,
+        0.,
+        negf 0.5,
+        negf 0.707107]
+      )
+  in
+  let th = vecCreate 3 (lam. num 1.) in
+  let u = vecCreate 2 (lam. num 0.) in
+  let t = num 0. in
+  let g = vecCreate 2 (lam. num 0.) in
+  ivp.g th u t x g;
+  vecToSeq g
+with [num 0.707107, num (negf 0.707107)]
 
 utest
-  let res = daecoreResidual testSystems.pendulum.dae in
-  tensorToSeqExn res.ds
-with [2, 2, 0]
-
-utest
-  let res = daecoreResidual testSystems.pendulum.dae in
-  tensorToSeqExn res.es
-with [0, 0]
-
-utest
-  let res = daecoreResidual testSystems.pendulum.dae in
-  res.ny
-with 5
+  let ivp = daecoreIVP testSystems.pendulum.dae testSystems.pendulum.g in
+  (ivp.structureY, ivp.structureYP, ivp.structureU, ivp.isdiff, ivp.structureX)
+with (
+  [(0, 0), (0, 1), (1, 0), (1, 1), (2, 0)],
+  [(0, 1), (0, 2), (1, 1), (1, 2), (2, 1)],
+  [(0, 0), (1, 0)],
+  [true, true, true, true, false],
+  [(0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2), (2, 0)]
+)
 
 -- Stabilized low-index residual
-let daecoreResidualStabilized : DAE -> DaecoreResidual = lam dae.
-  if not (daeConsistent dae) then
-    error "Inconsistent DAE: daecore.daecoreResidual"
-  else
-    let fs = daeResiduals dae in
-    let vs = daeVars dae in
-    let us = daeInputs dae in
-
-    let sigma = sigmaMatrix vs in
-    match sigmaIndexReduce sigma with
-      { cs = cs, ds = ds, incidenceJ = incidenceJ }
-    then
-      let es = inputOffsets sigma cs us in
-      let blocks = bltSort sigma incidenceJ in
-      let lambdas = sortFindLambda {
-        sigma = sigma,
-        ds = ds,
-        blocks = blocks,
-        incidenceJ = incidenceJ
-      } in
-
-      let stateGet = offsetGetYYPLambdas { ds = ds, lambdas = lambdas } in
-      let stateSet = offsetSetYYPLambdas { ds = ds, lambdas = lambdas } in
-
-      let res : FirstOrderResidual = residualStabilized {
-        sigma = sigma,
-        cs = cs,
-        ds = ds,
-        incidenceJ = incidenceJ,
-        lambdas = lambdas,
-        blocks = blocks,
-        us = us
-      } fs in
-
-      {
-        res = res.res,
-        stateGet = stateGet,
-        stateSet = stateSet,
-        ds = res.ds,
-        es = res.es,
-        ny = res.ny
-      }
-    else never
+let daecoreIVPStabilized : DAE -> ConstraintFun -> DaecoreIVP
+= lam dae. lam g.
+  let fs = dae.residual in
+  let vs = dae.variables in
+  let us = dae.inputs in
+  let sigma = sigmaMatrix vs in
+  match sigmaIndexReduce sigma with
+    { cs = cs, ds = ds, incidenceJ = incidenceJ }
+  then
+    let es = inputOffsets cs us in
+    let blocks = bltSort sigma incidenceJ in
+    let lambdas = sortFindLambda {
+      sigma = sigma,
+      ds = ds,
+      blocks = blocks,
+      incidenceJ = incidenceJ
+    } in
+    let res : FirstOrderResidual = residualStabilized {
+      sigma = sigma,
+      cs = cs,
+      ds = ds,
+      incidenceJ = incidenceJ,
+      lambdas = lambdas,
+      blocks = blocks,
+      us = us
+    } fs in
+    let objf = objective { fs = fs, cs = cs, ds = ds, es = es } in
+    let g = constraintFun { g = g, ds = ds, es = es } in
+    let structureX = offsetToStructure ds in
+    {
+      resf = res.resf,
+      structureY = res.structureY,
+      structureYP = res.structureYP,
+      structureU = res.structureU,
+      isdiff = res.isdiff,
+      objf = objf,
+      g = g,
+      structureX = structureX
+    }
+  else never
 
 utest
-  let res = daecoreResidualStabilized testSystems.pendulum.dae in
-  let y = tensorOfSeqExn tcreate [6] (map num [1., 0., 0., 0., 0., 0.]) in
-  let yp = tensorOfSeqExn tcreate [6] (map num [0., 0., 0., negf 1., 0., 0.]) in
-  let u = tcreate [2] (lam. tcreate [1] (lam. num 0.)) in
-  let r = tcreate [6] (lam. num 0.) in
+  let ivp =
+    daecoreIVPStabilized testSystems.pendulum.dae testSystems.pendulum.g
+  in
+  let y = vecOfSeq (map num [1., 0., 0., 0., 0., 0.]) in
+  let yp = vecOfSeq (map num [0., 0., 0., negf 1., 0., 0.]) in
+  let th = vecCreate 3 (lam. num 1.) in
+  let u = vecCreate 2 (lam. num 0.) in
+  let r = vecCreate 6 (lam. num 0.) in
   let t = num 0. in
-  res.res t y yp u r;
-  tensorToSeqExn r
+  ivp.resf th u t y yp r;
+  vecToSeq r
 with create 6 (lam. num 0.) using eqSeq (dualnumEq eqf)
 
 utest
-  let res = daecoreResidualStabilized testSystems.pendulum.dae in
-  let y = tcreate [6] (lam. 0) in
-  let yp = tcreate [6] (lam. 0) in
-  res.stateSet y yp (0, 0) 1;
-  res.stateSet y yp (0, 1) 2;
-  res.stateSet y yp (0, 2) 3;
-  res.stateSet y yp (1, 0) 4;
-  res.stateSet y yp (1, 1) 5;
-  res.stateSet y yp (1, 2) 6;
-  res.stateSet y yp (2, 0) 7;
-  (tensorToSeqExn y, tensorToSeqExn yp)
-with ([1, 2, 4, 5, 0, 0], [2, 3, 5, 6, 7, 0])
+  let ivp =
+    daecoreIVPStabilized testSystems.pendulum.dae testSystems.pendulum.g
+  in
+  let x =
+    vecOfSeq
+      (map num [
+        0.707107,
+        0.,
+        negf 0.5,
+        negf 0.707107,
+        0.,
+        negf 0.5,
+        negf 0.707107]
+      )
+  in
+  let th = vecCreate 3 (lam. num 1.) in
+  let u = vecCreate 2 (lam. num 0.) in
+  let t = num 0. in
+  _unpack (ivp.objf th u t x)
+with 0. using eqfApprox 1.e-10
 
 utest
-  let res = daecoreResidualStabilized testSystems.pendulum.dae in
-  let y = tcreate [6] (lam idx. addi 1 (head idx)) in
-  let yp = tcreate [6] (lam idx. addi 7 (head idx)) in
-  [
-    res.stateGet y yp (0, 0),
-    res.stateGet y yp (0, 1),
-    res.stateGet y yp (0, 2),
-    res.stateGet y yp (1, 0),
-    res.stateGet y yp (1, 1),
-    res.stateGet y yp (1, 2),
-    res.stateGet y yp (2, 0)
-  ]
-with [1, 2, 8, 3, 4, 10, 11]
-
-utest
-  let res = daecoreResidualStabilized testSystems.pendulum.dae in
-  tensorToSeqExn res.ds
-with [2, 2, 1, 1]
-
-utest
-  let res = daecoreResidualStabilized testSystems.pendulum.dae in
-  tensorToSeqExn res.es
-with [0, 0]
-
-utest
-  let res = daecoreResidualStabilized testSystems.pendulum.dae in
-  res.ny
-with 6
+  let ivp =
+    daecoreIVPStabilized testSystems.pendulum.dae testSystems.pendulum.g
+  in
+  (ivp.structureY, ivp.structureYP, ivp.structureU, ivp.isdiff, ivp.structureX)
+with (
+  [(0, 0), (0, 1), (1, 0), (1, 1), (2, negi 1), (3, negi 1)],
+  [(0, 1), (0, 2), (1, 1), (1, 2), (2, 0), (3, 0)],
+  [(0, 0), (1, 0)],
+  [true, true, true, true, true, true],
+  [(0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2), (2, 0)]
+)

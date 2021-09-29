@@ -14,12 +14,12 @@ A full working and documented example can be found in [examples/pendulum-actuate
 
 To compile and simulate this model do (assuming the miking compiler `mi` is added to `PATH`)
 ```
-mi compile examples/pendulum-actuated-ipm.mc && ./pendulum-actuated-ipm
+make examples/pendulum-actuated-ipm.run
 ```
 
 To also plot the result using gnuplot you instead do
 ```
-mi compile examples/pendulum-actuated-ipm.mc && ./pendulum-actuated-ipm | ./tools/csvplot
+make examples/pendulum-actuated-ipm.run | ./tools/csvplot
 ```
 
 ## Inteface
