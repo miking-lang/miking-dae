@@ -8,8 +8,6 @@ include "mexpr/symbolize.mc"
 include "mexpr/cse.mc"
 include "mexpr/const-transformer.mc"
 
-include "pead::constant-fold.mc"
-
 include "./dae.mc"
 include "./desugar.mc"
 include "./dae-arg.mc"
@@ -17,7 +15,7 @@ include "./dae-arg.mc"
 let peadaeNameSpace = "PEADAE"
 
 lang DAECompile =
-  DAE + PEADConstantFold + MExprFindSym + MExprSubstitute + BootParser + CSE
+  DAE + PEvalLetInline + MExprFindSym + MExprSubstitute + BootParser + CSE
 
   sem daeSrcPathExn : () -> String
   sem daeSrcPathExn =| () ->
@@ -109,14 +107,15 @@ lang DAECompile =
         daeGenOutExpr daer
       ]
       in
+      let pevalInlineLets = pevalInlineLets (sideEffectEnvEmpty ()) in
       match
         if options.disablePeval then ts
-        else map (lam t. constantfoldLets (peval t)) ts
+        else map (lam t. pevalInlineLets (peval t)) ts
         with [iexpr, rexpr, oexpr]
       in
       match
         if options.constantFold then
-          (constantfold iexpr, constantfold rexpr, constantfold oexpr)
+          (pevalInlineLets iexpr, pevalInlineLets rexpr, pevalInlineLets oexpr)
         else (iexpr, rexpr, oexpr)
         with (iexpr, rexpr, oexpr)
       in

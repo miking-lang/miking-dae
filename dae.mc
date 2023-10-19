@@ -3,8 +3,6 @@ include "these.mc"
 include "mexpr/free-vars.mc"
 include "mexpr/cse.mc"
 
-include "pead::constant-fold.mc"
-
 include "./desugar.mc"
 include "./daecore-structure.mc"
 include "./lib/vec.mc"
@@ -22,7 +20,7 @@ let daeID : (Name, Int) -> Name
         modref _daeIDMap (mapInsert id name daeIDMap);
         name
 
-lang DAE = DAEAst + MExprFreeVars + PEADConstantFold + MExprCSE
+lang DAE = DAEAst + MExprFreeVars + PEvalLetInline + MExprCSE
   sem daeAnnotDVars : TmDAERec -> TmDAERec
   sem daeAnnotDVars =| dae ->
     let vars = mapFromSeq nameCmp dae.vars in
@@ -503,6 +501,7 @@ lang DAE = DAEAst + MExprFreeVars + PEADConstantFold + MExprCSE
       match dae.vars with
         [(y, TySeq {ty = TyFloat _}), (yp, TySeq {ty = TyFloat _})]
       then
+        let pevalInlineLets = pevalInlineLets (sideEffectEnvEmpty ()) in
         let y = nameSetNewSym y in
         let yp = nameSetNewSym yp in
         let n = length dae.eqns in
@@ -535,7 +534,7 @@ lang DAE = DAEAst + MExprFreeVars + PEADConstantFold + MExprCSE
           nulams_ yyp
             (utuple_ [
               seq_ [],
-              constantfoldLets
+              pevalInlineLets
                 (peval (appSeq_ jact (cons (idxs_ sIdxs) args)))
             ])
         case ([], dIdxs) then
@@ -548,7 +547,7 @@ lang DAE = DAEAst + MExprFreeVars + PEADConstantFold + MExprCSE
           nulams_ yyp
             (utuple_ [
               appSeq_ jact (cons (idxs_ dIdxs) args),
-              constantfoldLets
+              pevalInlineLets
                 (peval (appSeq_ jact (cons (idxs_ sIdxs) args)))
             ])
         end
@@ -562,9 +561,11 @@ lang DAE = DAEAst + MExprFreeVars + PEADConstantFold + MExprCSE
   sem daeGenMixedJacYp phi =| dae -> _daeGenMixedJac false phi dae
 end
 
-lang TestLang = DAE + DAEParseAnalysis + DAEParseDesugar + PEADConstantFold end
+lang TestLang = DAE + DAEParseAnalysis + DAEParseDesugar end
 
 mexpr
+
+let pevalInlineLets = pevalInlineLets (sideEffectEnvEmpty ()) in
 
 ----------------
 -- Test setup --
@@ -1054,7 +1055,7 @@ let expected = _parseExpr "
  [ 2., 0., 0., negf 1., 0. ])
   "
 in
-let actual = constantfoldLets (peval iexpr) in
+let actual = pevalInlineLets (peval iexpr) in
 -- utest expected with actual using eqExpr in
 -- OK, utest fails due to float comparsions.
 logSetLogLevel logLevel.error;
@@ -1073,7 +1074,7 @@ lam y: [Float]. lam yp: [Float].
   t5
   "
 in
-let actual = constantfoldLets (peval oexpr) in
+let actual = pevalInlineLets (peval oexpr) in
 utest expected with actual using eqExpr in
 
 let expected = _parseExpr "
@@ -1092,7 +1093,7 @@ lam y. lam yp. [
 ]
   "
 in
-let actual = constantfoldLets (peval rexpr) in
+let actual = pevalInlineLets (peval rexpr) in
 utest expected with actual using eqExpr in
 
 let expected = _parseExpr "
@@ -1134,7 +1135,7 @@ in
 let daer2 = daeOrderReduce state2 (nameSym "y") (nameSym "yp") daer2 in
 let rexpr2 = daeGenResExpr daer2 in
 let actual =
-  constantfoldLets (pevalExpr { pevalCtxEmpty () with maxRecDepth = 0 } rexpr2)
+  pevalInlineLets (pevalExpr { pevalCtxEmpty () with maxRecDepth = 0 } rexpr2)
 in
 utest expected with actual using eqExpr in
 
@@ -1173,7 +1174,7 @@ in
 let daer2 = daeOrderReduce state2 (nameSym "y") (nameSym "yp") daer2 in
 let rexpr2 = daeGenResExpr daer2 in
 let actual =
-  constantfoldLets (pevalExpr { pevalCtxEmpty () with maxRecDepth = 3 } t)
+  pevalInlineLets (pevalExpr { pevalCtxEmpty () with maxRecDepth = 3 } t)
 in
 
 logSetLogLevel logLevel.error;
@@ -1286,7 +1287,7 @@ lam idxs. lam y. lam yp.
     idxs
   "
 in
-let actual = constantfoldLets (peval (daeGenJacY daer)) in
+let actual = pevalInlineLets (peval (daeGenJacY daer)) in
 utest expected with actual using eqExpr in
 logSetLogLevel logLevel.error;
 logMsg logLevel.debug (lam. strJoin "\n" ["jacYp expected:", expr2str expected]);
@@ -1340,7 +1341,7 @@ lam y. lam yp. [
   "
 in
 let actual =
-  constantfoldLets (peval (app_ (daeGenJacY daer) idxs))
+  pevalInlineLets (peval (app_ (daeGenJacY daer) idxs))
 in
 utest expected with actual using eqExpr in
 
