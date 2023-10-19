@@ -1,0 +1,26 @@
+#!/usr/bin/python3
+
+import sys
+import numpy as np
+
+epsilon = 1.0e-2
+
+buf = []
+
+for line in sys.stdin:
+    if "" == line.rstrip():
+        break
+
+    buf.append(np.fromstring(line, sep=","))
+
+    if len(buf) > 2:
+        print(sys.argv[0] + ": Expected two lines", file=sys.stderr)
+        exit(1)
+
+err = np.mean((buf[0] - buf[1]) ** 2)
+if err > epsilon:
+    print(
+        f"{sys.argv[0]}: Mean squared error = {err} > {epsilon}",
+        file=sys.stderr,
+    )
+    exit(1)

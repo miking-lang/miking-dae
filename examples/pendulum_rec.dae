@@ -1,0 +1,20 @@
+let mul = lam x. lam y. x*y end
+reclet pow = lam n. lam x.
+  if n <. 1. then 1. else x * (pow (n - 1.) x)
+end
+variables
+x, vx, y, vy, h, u, p : Float
+init
+x = 1.;
+vy' = 0. - 1.;
+p = 2.     -- this simulates a runtime parameter
+equations
+p' = 0.;   -- the parameter never changes
+vx = x';
+vy = y';
+vx' = mul x h;
+vy' = mul y h - 1.;
+pow 2. x + pow p y = pow 2. 1.;
+u = pow 2. vx + pow 2. vy
+output
+{x, vx, vx'}

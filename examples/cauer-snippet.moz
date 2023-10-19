@@ -1,0 +1,27 @@
+def Sections(n3: Node, acc: (Model, Node), n: Int)
+  -> (Model, Node) = {
+  if n < 1 then error "n is not a positive number"
+  else
+    def (sections, n1) = acc;
+    def n2: Node;
+    def section = Inductor(L, n1, n2);
+                  Capacitor(C, n2, n3);
+    def acc = (section; sections, n2);
+    if n == 1 then acc
+    else Sections(n3, acc, n - 1)
+}
+
+def CauerTopology(n: Int) = {
+  def n1, n3: Node;
+  def uIn, uOut: Voltage;
+  def t: Signal;
+  def acc =
+    (VoltageSource(uIn, n1, n3), n1);
+  def (sections, n2) =
+    Sections(n3, acc, n);
+  t' = 1.;
+  sections;
+  Resistor(R, n3, n2);
+  VoltageSensor(uOut, n3, n2);
+  uIn = 1. / (1. + exp(-t))
+}

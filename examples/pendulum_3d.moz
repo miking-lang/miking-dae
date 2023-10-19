@@ -1,0 +1,39 @@
+include GRAPHSIMVISUAL
+
+def world, fJoint, fBody: Frame
+
+def m = 1.
+def w = 5.
+def h = 1.
+def d = 1.
+
+def Jd = mkCuboidInertia m w h d
+def body(xm : Vector3, qm : Orientation3) -> (Frame -> Model) = {
+	BodyV world m Jd (visualSolid (cuboid w h d) (stdMaterial GREEN 0.5)) xm qm
+}
+def gravity = Gravity world
+def arm(qa : Orientation3) -> (Frame -> Frame -> Model) = {
+ 	RigidArm world (-w / 2., 0., 0.) qa
+}
+
+def model = {
+  def qa = _mkRigidArmVar ();
+  def (_, qm) = _mkBodyVars ();
+  def x, y, z: Real;
+  def xm = vec3 x y z;
+  fJoint -- arm qa -- fBody;
+  body xm qm fBody;
+  gravity m fBody;
+  world -- SphericalJoint -- fJoint;
+  norm2 qa ~= 1.;
+  norm2 qm ~= 1.;
+  qa <~ IDQ;
+  qm <~ IDQ;
+  probe x;
+  probe y;
+  probe z
+}
+
+//def _ = elaborateToFile "scene.json" (export2ModelicaFileDebug "model.mo" "Model") model
+//def _ = writeFile "model.mc" (export2Daecore (elaborate model) ++ "\n")
+def _ = print (export2peadae (elaborate model) ++ "\n")
