@@ -20,9 +20,6 @@ let doLoop : Int -> (Int -> ()) -> ()
     in
     doLoop 0
 
--- Built-ins
-let onehot = lam n. lam i. create n (lam j. if eqi i j then 1. else 0.)
-
 type Vec = Tensor[Float]
 type Mat = Tensor[Float]
 
@@ -329,6 +326,5 @@ dprint [
   dprint [daeRuntimeBenchmarkJac],
   dprint [daeRuntimeRun],
   dprint [sin, cos, exp, sqrt],
-  dprint [pow],
-  dprint [onehot]
+  dprint [pow]
 ]

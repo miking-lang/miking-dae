@@ -7,12 +7,12 @@ include "mexpr/ast-result.mc"
 include "mexpr/keyword-maker.mc"
 include "mexpr/boot-parser.mc"
 
+include "peval/peval.mc"
+
 include "map.mc"
 include "result.mc"
 include "error.mc"
 include "tuple.mc"
-
-include "pead::ad.mc"
 
 include "./ast_gen.mc"
 
@@ -23,7 +23,7 @@ let _daeAstKeywords = ["prim"]
 let dvarCmp = tupleCmp2 nameCmp subi
 
 lang DAEAst = DAEParseAst + AstResult +
-  MExprSym + MExprEq + MExprPrettyPrint + MExprTypeCheck + AD +
+  MExprSym + MExprEq + MExprPrettyPrint + MExprTypeCheck + MExprPEval +
   BootParser + KeywordMaker
 
   type TmDVarRec = {
@@ -46,6 +46,37 @@ lang DAEAst = DAEParseAst + AstResult +
   -- x^(n) in MExpr
   | TmDVar TmDVarRec
   | TmDAE TmDAERec
+
+  -- Extended builtins
+  syn Const =
+  | CSin {}
+  | CCos {}
+  | CSqrt {}
+  | CExp {}
+
+  sem daeBuiltin : () -> [(String, Const)]
+  sem daeBuiltin =| _ ->
+    [
+      ("sin", CSin ()),
+      ("cos", CCos ()),
+      ("sqrt", CSqrt ()),
+      ("exp", CExp ())
+    ]
+
+  -- PEval
+  sem delta info =
+  | (CSin _, [TmConst {val = CFloat r}]) ->
+    let b = astBuilder info in
+    b.float (sin r.val)
+  | (CCos _, [TmConst {val = CFloat r}]) ->
+    let b = astBuilder info in
+    b.float (cos r.val)
+  | (CSqrt _, [TmConst {val = CFloat r}]) ->
+    let b = astBuilder info in
+    b.float (sqrt r.val)
+  | (CExp _, [TmConst {val = CFloat r}]) ->
+    let b = astBuilder info in
+    b.float (exp r.val)
 
   sem tmVarRecToTmDVarRec
     : TmDVarRec -> ({ident : Name, ty : Type, info : Info, frozen : Bool}, Int)
@@ -151,13 +182,6 @@ lang DAEAst = DAEParseAst + AstResult +
   sem dvars : Expr -> Set (Name, Int)
   sem dvars =| t -> dvarsExpr (setEmpty (tupleCmp2 nameCmp subi)) t
 
-  -- AD
-  sem adExprH ctx n =
-  | TmDVar r ->
-    let b = peadAstBuilder r.info in
-    b.taylorcoef
-      (create (succ n) (lam i. TmDVar { r with order = addi r.order i }))
-
   -- PEval
   sem pevalBindThis =
   | TmDVar _ -> false
@@ -243,6 +267,12 @@ lang DAEAst = DAEParseAst + AstResult +
     (env, strJoin " " ["prim", int2string order, var])
   | TmDAE r -> pprintCode indent env (_tmDAERecToTm r)
 
+  sem getConstStringCode (indent : Int) =
+  | CSin _ -> "sin"
+  | CCos _ -> "cos"
+  | CSqrt _ -> "sqrt"
+  | CExp _ -> "exp"
+
   -- Sym
   sem symbolizeExpr (env : SymEnv) =
   | TmDVar r ->
@@ -307,6 +337,9 @@ lang DAEAst = DAEParseAst + AstResult +
       out = out
     }
 
+  sem tyConst =
+  | CSin _ | CCos _ | CSqrt _ | CExp _ -> tyarrows_ [tyfloat_, tyfloat_]
+
   sem addTopTypes : TCEnv -> Expr -> TCEnv
   sem addTopTypes env =
   | TmLet r -> addTopTypes (_insertVar r.ident r.tyBody env) r.inexpr
@@ -318,13 +351,21 @@ lang DAEAst = DAEParseAst + AstResult +
   | TmExt r -> addTopTypes (_insertVar r.ident r.tyIdent env) r.inexpr
   | t -> env
 
+  -- Arity
+  sem constArity =
+  | CSin _ | CCos _ | CSqrt _ | CExp _ -> 1
+
+  -- Side-effects
+  sem constHasSideEffect =
+  | CSin _ | CCos _ | CSqrt _ | CExp _ -> false
+
   -- Parse
   sem parseDAEExprExn : String -> Expr
   sem parseDAEExprExn =| str ->
     let t = parseMExprString {
       keywords = _daeAstKeywords,
       allowFree = true,
-      builtin = concat builtin (adBuiltin ())
+      builtin = concat builtin (daeBuiltin ())
     } str
     in makeKeywords t
 
@@ -335,7 +376,7 @@ lang DAEAst = DAEParseAst + AstResult +
         { _defaultBootParserParseMCoreFileArg () with
           keywords = _daeAstKeywords,
           allowFree = true,
-          builtin = concat builtin (adBuiltin ())
+          builtin = concat builtin (daeBuiltin ())
         } file
     in makeKeywords t
 

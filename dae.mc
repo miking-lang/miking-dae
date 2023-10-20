@@ -2,7 +2,10 @@ include "these.mc"
 
 include "mexpr/free-vars.mc"
 include "mexpr/cse.mc"
+include "peval/peval.mc"
 
+include "./ast.mc"
+include "./ad.mc"
 include "./desugar.mc"
 include "./daecore-structure.mc"
 include "./lib/vec.mc"
@@ -20,7 +23,7 @@ let daeID : (Name, Int) -> Name
         modref _daeIDMap (mapInsert id name daeIDMap);
         name
 
-lang DAE = DAEAst + MExprFreeVars + PEvalLetInline + MExprCSE
+lang DAE = DAEAst + MExprFreeVars + PEval + PEvalLetInline + MExprCSE + AD
   sem daeAnnotDVars : TmDAERec -> TmDAERec
   sem daeAnnotDVars =| dae ->
     let vars = mapFromSeq nameCmp dae.vars in
@@ -565,13 +568,13 @@ lang TestLang = DAE + DAEParseAnalysis + DAEParseDesugar end
 
 mexpr
 
-let pevalInlineLets = pevalInlineLets (sideEffectEnvEmpty ()) in
-
 ----------------
 -- Test setup --
 ----------------
 
 use TestLang in
+
+let pevalInlineLets = pevalInlineLets (sideEffectEnvEmpty ()) in
 
 let _parseExpr = lam prog.
   (typeCheck (symbolize (parseDAEExprExn prog)))

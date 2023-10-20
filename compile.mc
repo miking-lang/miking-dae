@@ -52,8 +52,7 @@ lang DAECompile =
         "cos",
         "exp",
         "pow",
-        "sqrt",
-        "onehot"
+        "sqrt"
       ] in
       let runtimeNames =
         foldl2
@@ -192,7 +191,7 @@ lang DAECompile =
               (lam env. lam x. match x with (str, c) in
                            mapInsert c (mapFindExn str runtimeNames) env)
               (mapEmpty cmpConst)
-              (adBuiltin ())
+              (daeBuiltin ())
           in
           constTransformConstsToVars env t
         end
