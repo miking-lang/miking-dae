@@ -390,7 +390,23 @@ lang DAE = DAEAst + MExprFreeVars + PEval + PEvalLetInline + MExprCSE + AD
 
   sem daeGenResExpr : TmDAERec -> Expr
   sem daeGenResExpr =| dae ->
-    bind_ dae.bindings (nlams_ dae.vars (seq_ dae.eqns))
+    let errMsg = _daeErrMsg "daeGenMutableResExpr" in
+    match dae.vars with
+      [(y, TySeq {ty = TyFloat _}), (yp, TySeq {ty = TyFloat _})]
+    then
+      let r = nameSym "r" in
+      bind_
+        dae.bindings
+        (nulams_ [y, yp, r]
+           (bindall_
+              (snoc
+                 (mapi
+                    (lam i. lam e.
+                      ulet_ "" (utensorLinearSetExn_ (nvar_ r) (int_ i) e))
+                    dae.eqns)
+                 unit_)))
+    else
+      error (errMsg "Not a first-order DAE" (TmDAE dae))
 
   sem daeJacStructure : TmDAERec -> ([[Int]], [[Int]])
   sem daeJacStructure =| dae ->

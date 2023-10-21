@@ -48,7 +48,7 @@ let usage = lam. strJoin " " ["USAGE:", get argv 0, "interval", "stepsize"]
 let errorExit = lam. print (usage ()); print "\n"; exit 1
 
 type DAEInit = ([Float], [Float])
-type DAEResf = Array Float -> Array Float -> [Float]
+type DAEResf = Array Float -> Array Float -> Tensor[Float] -> ()
 type DAEJacVals = [((Int, Int), () -> Float)]
 type DAEJacf = Array Float -> Array Float -> (DAEJacVals, DAEJacVals)
 type DAEOutf = Array Float -> Array Float -> ()
@@ -228,9 +228,8 @@ let daeRuntimeRun
         arraySet ay i (vget y i);
         arraySet ayp i (vget yp i));
       let ws = wallTimeMs () in
-      let t = resf ay ayp in
+      resf ay ayp r;
       let we = wallTimeMs () in
-      iteri (vset r) t;
       modref resTimeCount (addf (deref resTimeCount) (subf we ws));
       ()
     in
