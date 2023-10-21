@@ -134,7 +134,8 @@ lang DAE = DAEAst + MExprFreeVars + PEval + PEvalLetInline + MExprCSE + AD
     recursive let inner = lam t.
       match t with
         TmApp (appr1 & {
-          lhs = TmApp (appr2 & {lhs = TmConst {val = CGet _}, rhs = TmVar r}),
+          lhs =
+            TmApp (appr2 & {lhs = TmConst {val = CArrayGet _}, rhs = TmVar r}),
           rhs = TmConst {val = CInt {val = i }},
           info = info
         })
@@ -206,8 +207,8 @@ lang DAE = DAEAst + MExprFreeVars + PEval + PEvalLetInline + MExprCSE + AD
 
   sem daeOrderReduce : DAEFirstOrderState -> Name -> Name -> TmDAERec -> TmDAERec
   sem daeOrderReduce state y yp =| dae ->
-    let gety_ = lam i. get_ (nvar_ y) (int_ i) in
-    let getyp_ = lam i. get_ (nvar_ yp) (int_ i) in
+    let gety_ = lam i. appf2_ (uconst_ (CArrayGet ())) (nvar_ y) (int_ i) in
+    let getyp_ = lam i. appf2_ (uconst_ (CArrayGet ())) (nvar_ yp) (int_ i) in
     recursive let subs = lam t.
       match t with TmDVar r then
         theseThese
@@ -259,7 +260,8 @@ lang DAE = DAEAst + MExprFreeVars + PEval + PEvalLetInline + MExprCSE + AD
                 lhs = TmApp {
                   lhs = TmConst {val = CSubf _},
                   rhs = TmApp {
-                    lhs = TmApp {lhs = TmConst {val = CGet _}, rhs = TmVar r},
+                    lhs =
+                      TmApp {lhs = TmConst {val = CArrayGet _}, rhs = TmVar r},
                     rhs = TmConst {val = CInt {val = i}}
                   }
                 },
@@ -347,38 +349,44 @@ lang DAE = DAEAst + MExprFreeVars + PEval + PEvalLetInline + MExprCSE + AD
 
   sem daeGenOutExpr : TmDAERec -> Expr
   sem daeGenOutExpr =| dae ->
-    let defaultPrint = print_ (str_ "Cannot print output") in
-    let genPrintWithCommaSep = lam ts.
-      if null ts then unit_
-      else
-        foldl1
-          semi_
-          (snoc
-             (map
-                (lam t. semi_ (print_ t) (print_ (str_ ",")))
-                (init ts))
-             (semi_ (print_ (last ts)) (print_ (str_ "\n"))))
-    in
-    let _r  = nameSym "r" in
-    let body =
-      switch tyTm dae.out
-      case TyFloat _ then print_ dae.out
-      case TyRecord r then
-        let isFloatTy = lam ty. match ty with TyFloat _ then true else false in
-        match record2tuple r.fields with Some tys then
-          if forAll isFloatTy tys then
-            let inexpr =
-              genPrintWithCommaSep
-                (create (length tys)
-                   (lam i. float2string_ (tupleproj_ i (nvar_ _r))))
-            in
-            bind_ (nulet_ _r dae.out) inexpr
+    let errMsg = _daeErrMsg "daeGenOutExpr" in
+    match dae.vars with
+      [(y, TySeq {ty = TyFloat _}), (yp, TySeq {ty = TyFloat _})]
+    then
+      let defaultPrint = print_ (str_ "Cannot print output") in
+      let genPrintWithCommaSep = lam ts.
+        if null ts then unit_
+        else
+          foldl1
+            semi_
+            (snoc
+               (map
+                  (lam t. semi_ (print_ t) (print_ (str_ ",")))
+                  (init ts))
+               (semi_ (print_ (last ts)) (print_ (str_ "\n"))))
+      in
+      let _r  = nameSym "r" in
+      let body =
+        switch tyTm dae.out
+        case TyFloat _ then print_ dae.out
+        case TyRecord r then
+          let isFloatTy = lam ty. match ty with TyFloat _ then true else false in
+          match record2tuple r.fields with Some tys then
+            if forAll isFloatTy tys then
+              let inexpr =
+                genPrintWithCommaSep
+                  (create (length tys)
+                     (lam i. float2string_ (tupleproj_ i (nvar_ _r))))
+              in
+              bind_ (nulet_ _r dae.out) inexpr
+            else defaultPrint
           else defaultPrint
-        else defaultPrint
-      case _ then defaultPrint
-      end
-    in
-    bind_ dae.bindings (nlams_ dae.vars body)
+        case _ then defaultPrint
+        end
+      in
+      bind_ dae.bindings (nulams_ [y, yp] body)
+    else
+      error (errMsg "Not a first-order DAE" (TmDAE dae))
 
   sem daeGenResExpr : TmDAERec -> Expr
   sem daeGenResExpr =| dae ->
@@ -395,7 +403,7 @@ lang DAE = DAEAst + MExprFreeVars + PEval + PEvalLetInline + MExprCSE + AD
       recursive let inner = lam ident. lam acc. lam t.
         match t with
           TmApp {
-            lhs = TmApp {lhs = TmConst {val = CGet _}, rhs = TmVar r},
+            lhs = TmApp {lhs = TmConst {val = CArrayGet _}, rhs = TmVar r},
             rhs = TmConst {val = CInt {val = i}}
           }
         then

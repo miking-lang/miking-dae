@@ -53,6 +53,7 @@ lang DAEAst = DAEParseAst + AstResult +
   | CCos {}
   | CSqrt {}
   | CExp {}
+  | CArrayGet {}
 
   sem daeBuiltin : () -> [(String, Const)]
   sem daeBuiltin =| _ ->
@@ -60,7 +61,8 @@ lang DAEAst = DAEParseAst + AstResult +
       ("sin", CSin ()),
       ("cos", CCos ()),
       ("sqrt", CSqrt ()),
-      ("exp", CExp ())
+      ("exp", CExp ()),
+      ("arrayGet", CArrayGet ())
     ]
 
   -- PEval
@@ -185,6 +187,13 @@ lang DAEAst = DAEParseAst + AstResult +
   -- PEval
   sem pevalBindThis =
   | TmDVar _ -> false
+  | TmApp {
+    lhs = TmApp {
+      lhs = TmConst { val = CArrayGet _},
+      rhs = TmVar _
+    },
+    rhs = TmConst { val = CInt _} | TmVar _
+  } -> false
 
   sem pevalEval ctx k =
   | TmDVar r -> k (TmDVar r)
@@ -272,6 +281,7 @@ lang DAEAst = DAEParseAst + AstResult +
   | CCos _ -> "cos"
   | CSqrt _ -> "sqrt"
   | CExp _ -> "exp"
+  | CArrayGet _ -> "arrayGet"
 
   -- Sym
   sem symbolizeExpr (env : SymEnv) =
@@ -336,9 +346,14 @@ lang DAEAst = DAEParseAst + AstResult +
       eqns = eqns,
       out = out
     }
+  -- NOTE(oerikss, 2023-10-21): We pretend that these are tensors statically
+  -- | TmConst {val = CArray _, info = info} ->
+  --   TyTensor {info = info, ty = TyFloat {info = info}}
 
   sem tyConst =
   | CSin _ | CCos _ | CSqrt _ | CExp _ -> tyarrows_ [tyfloat_, tyfloat_]
+  | CArrayGet _ ->
+    tyalls_ ["a", "b"] (tyarrows_ [tyvar_ "a", tyint_, tyvar_ "b"])
 
   sem addTopTypes : TCEnv -> Expr -> TCEnv
   sem addTopTypes env =
@@ -354,10 +369,12 @@ lang DAEAst = DAEParseAst + AstResult +
   -- Arity
   sem constArity =
   | CSin _ | CCos _ | CSqrt _ | CExp _ -> 1
+  | CArrayGet _ -> 2
 
   -- Side-effects
   sem constHasSideEffect =
   | CSin _ | CCos _ | CSqrt _ | CExp _ -> false
+  | CArrayGet _ -> false
 
   -- Parse
   sem parseDAEExprExn : String -> Expr

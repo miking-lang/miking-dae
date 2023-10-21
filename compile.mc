@@ -52,7 +52,11 @@ lang DAECompile =
         "cos",
         "exp",
         "pow",
-        "sqrt"
+        "sqrt",
+        "arrayGet",
+        "cArray1Set",
+        "sundialsMatrixDenseSet",
+        "sundialsMatrixDenseUpdate"
       ] in
       let runtimeNames =
         foldl2

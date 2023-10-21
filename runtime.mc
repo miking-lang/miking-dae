@@ -3,6 +3,7 @@ include "sundials/sundials.mc"
 include "sundials/ida.mc"
 include "arg.mc"
 include "option.mc"
+include "ext/array-ext.mc"
 
 let _debug = ref false
 let debugPrint = lam msg.
@@ -47,10 +48,10 @@ let usage = lam. strJoin " " ["USAGE:", get argv 0, "interval", "stepsize"]
 let errorExit = lam. print (usage ()); print "\n"; exit 1
 
 type DAEInit = ([Float], [Float])
-type DAEResf = [Float] -> [Float] -> [Float]
+type DAEResf = Array Float -> Array Float -> [Float]
 type DAEJacVals = [((Int, Int), () -> Float)]
-type DAEJacf = [Float] -> [Float] -> (DAEJacVals, DAEJacVals)
-type DAEOutf = [Float] -> [Float] -> ()
+type DAEJacf = Array Float -> Array Float -> (DAEJacVals, DAEJacVals)
+type DAEOutf = Array Float -> Array Float -> ()
 
 type Options = {
   interval : Float,
@@ -110,7 +111,10 @@ let usage = lam prog. join [
   "\n"
 ]
 
-let _randState = lam n. create n (lam. int2float (randIntU 0 10))
+let _randState = lam y.
+  doLoop (arrayLength y) (lam i.
+    arraySet y i (int2float (randIntU 0 10)))
+
 let _benchUsage = lam prog. join [prog, " INTEGER\n"]
 
 let parseArgs = lam n.
@@ -132,12 +136,16 @@ let daeRuntimeBenchmarkRes : Int -> DAEResf -> ()
       -- Set seed
       randSetSeed opt.seed;
       if stringIsInt neval then
+        let y = arrayCreateFloat n in
+        let r = vcreate n (lam. 0.) in
         let neval = string2int neval in
         let sum = ref 0. in
         let ws = wallTimeMs () in
         doLoop neval (lam.
-          let y = _randState n in --
-          modref sum (foldl addf (deref sum) (resf y y)));
+          _randState y;
+          resf y y r;
+          doLoop n (lam i.
+            modref sum (addf (deref sum) (vget r i))));
         let wt = subf (wallTimeMs ()) ws in
         print (join [
           "Executed the residual ",
@@ -159,19 +167,19 @@ let daeRuntimeBenchmarkJac : Int -> DAEJacf -> DAEJacf -> ()
       -- Set seed
       randSetSeed opt.seed;
       if stringIsInt neval then
+        let y = arrayCreateFloat n in
         let neval = string2int neval in
         let sum = ref 0. in
         let ws = wallTimeMs () in
         doLoop neval
           (lam.
-            let y = _randState n in
-            let yp = _randState n in
+            _randState y;
             let jy = iter (lam f. modref sum (addf (deref sum) (f.1 ()))) in
-            let fs = jacYf y yp in
+            let fs = jacYf y y in
             jy fs.0;
             jy fs.1;
             let jyp = iter (lam f. modref sum (addf (deref sum) (f.1 ()))) in
-            let fs = jacYpf y yp in
+            let fs = jacYpf y y in
             jyp fs.0;
             jyp fs.1;
             ());
@@ -207,14 +215,20 @@ let daeRuntimeRun
     let tol = idaSSTolerances opt.rtol opt.atol in
     let y = vcreate n (get y0) in
     let yp = vcreate n (get yp0) in
+    -- Pre-allocate residual states
+    -- OPT(oerikss, 2023-10-21): We read faster from these compared to BigArrays
+    -- (i.e. Tensors)
+    let ay = arrayCreateFloat n in
+    let ayp = arrayCreateFloat n in
     let resf = lam t. lam y. lam yp. lam r.
       -- gather statistics
       modref resEvalCount (succ (deref resEvalCount));
       -- compute residual
-      let y = create n (vget y) in
-      let yp = create n (vget yp) in
+      doLoop n (lam i.
+        arraySet ay i (vget y i);
+        arraySet ayp i (vget yp i));
       let ws = wallTimeMs () in
-      let t = resf y yp in
+      let t = resf ay ayp in
       let we = wallTimeMs () in
       iteri (vset r) t;
       modref resTimeCount (addf (deref resTimeCount) (subf we ws));
@@ -232,12 +246,17 @@ let daeRuntimeRun
     let lsolver =
       if numjac then idaDlsSolver (idaDlsDense v m)
       else
+        -- Pre-allocate Jacobian states
+        -- OPT(oerikss, 2022-10-21): See the comment for the residiual function
+        let ay = arrayCreateFloat n in
+        let ayp = arrayCreateFloat n in
         let jacf = lam jacargs : IdaJacArgs. lam m : SundialsMatrixDense.
           -- gather statistics
           modref jacEvalCount (succ (deref jacEvalCount));
           -- compute Jacobian
-          let y = create n (vget jacargs.y) in
-          let yp = create n (vget jacargs.yp) in
+          doLoop n (lam i.
+            arraySet ay i (vget jacargs.y i);
+            arraySet ayp i (vget jacargs.yp i));
           -- let m = sundialsMatrixDenseUnwrap m in
           let ws = wallTimeMs () in
           let jy =
@@ -247,7 +266,7 @@ let daeRuntimeRun
                 -- m is in column-major format
                 mset m i j (f ()))
           in
-          let fs = jacYf y yp in
+          let fs = jacYf ay ayp in
           jy fs.0;
           jy fs.1;
           let jyp =
@@ -257,7 +276,7 @@ let daeRuntimeRun
                 -- m is in column-major format
                 mupdate m i j (addf (mulf jacargs.c (f ()))))
           in
-          let fs = jacYpf y yp in
+          let fs = jacYpf ay ayp in
           jyp fs.0;
           jyp fs.1;
           let we = wallTimeMs () in
@@ -291,23 +310,27 @@ let daeRuntimeRun
             ["After idaCalcICYaYd:", stateToString y yp, vecToString "r" r]);
     idaSetStopTime s opt.interval;
     -- Solve
+    -- Pre-allocate output states
+    let ay = arrayCreateFloat n in
+    let ayp = arrayCreateFloat n in
     recursive let recur = lam t.
-      let y = create n (vget y) in
-      let yp = create n (vget yp) in
-      (if opt.outputOnlyLast then () else outf y yp);
+      doLoop n (lam i.
+        arraySet ay i (vget y i);
+        arraySet ayp i (vget yp i));
+      (if opt.outputOnlyLast then () else outf ay ayp);
       if gtf t opt.interval then ()
       else
         switch idaSolveNormal s { tend = addf t opt.stepSize, y = v, yp = vp }
         case (tend, IdaSuccess _) then recur tend
         case (_, IdaStopTimeReached _) then
-          (if opt.outputOnlyLast then outf y yp else ())
-               case (tend, IdaRootsFound _) then
-               printError (join ["Roots found at t = ", float2string tend]);
-               flushStderr ()
-               case (tend, IdaSolveError _) then
-               printError (join ["Solver error at t = ", float2string tend]);
-               flushStderr ()
-               end
+          (if opt.outputOnlyLast then outf ay ayp else ()); ()
+        case (tend, IdaRootsFound _) then
+          printError (join ["Roots found at t = ", float2string tend]);
+          flushStderr ()
+        case (tend, IdaSolveError _) then
+          printError (join ["Solver error at t = ", float2string tend]);
+          flushStderr ()
+        end
     in
     recur 0.;
     (if opt.dumpInfo then
@@ -326,5 +349,9 @@ dprint [
   dprint [daeRuntimeBenchmarkJac],
   dprint [daeRuntimeRun],
   dprint [sin, cos, exp, sqrt],
-  dprint [pow]
+  dprint [pow],
+  dprint [arrayGet],
+  dprint [cArray1Set],
+  dprint [sundialsMatrixDenseSet],
+  dprint [sundialsMatrixDenseUpdate]
 ]
