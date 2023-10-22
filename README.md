@@ -1,4 +1,4 @@
-# An Differential-Algebraic Equations (DAEs) DSL
+# A Differential-Algebraic Equations (DAEs) DSL
 This repository contains a DSL for expressing and numerically solving high-index
 DAEs. The DAEs may include recursive functions and the compilation use the
 forward-mode Partial Evaluation of Automatic Differentiation (PEAD) method[^1].
