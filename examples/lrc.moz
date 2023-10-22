@@ -1,0 +1,23 @@
+include GRAPHSIMVISUAL
+
+def y, u, t: Real
+
+def R = 2.
+def C = 3.
+def L = 4.
+
+def n1, n2: Node
+
+def RLC(y: Current, u: Voltage) -> Model = {
+  n1 -- Resistor(R) -- CurrentSensor(y) -- (Capacitor(C) || Inductor(L)) -- n2;
+  n1 -- VoltageSource(u) -- n2
+}
+
+def model = {
+  Clock(0., t);
+  u = sin(t);
+  RLC(y, u);
+  probe y
+}
+
+def _ = print (export2peadae (elaborate model) ++ "\n")

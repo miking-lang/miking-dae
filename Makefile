@@ -1,24 +1,54 @@
-SRC = $(wildcard *.mc)
-EXAMPLES = examples
-TESTS = $(SRC:.mc=.test)
+TOOL_NAME=peadae
+BIN_PATH=${HOME}/.local/bin
+
+SRCS := $(shell find . -name "*.mc" -a ! -name "peadae.mc" -a ! -name "ast_gen.mc" -a ! -wholename "./examples/*")
+TESTS := $(SRCS:.mc=.test)
+TESTBINS := $(SRCS:.mc=.test.exe.run)
+
+.PHONY: test test-examples watch-test clean
+
+all: build/${TOOL_NAME}
+
+build/${TOOL_NAME}: ${TOOL_NAME}.exe
+	mkdir -p build
+	mv ${TOOL_NAME}.exe build/${TOOL_NAME}
 
 test: $(TESTS)
 
-%.test: %.test.exe
+test-compiled: $(TESTBINS)
+
+test-examples:
+	$(MAKE) test -C examples
+
+test-all: test test-examples
+
+%.test: %.mc
+	mi --test $<
+	@echo ""
+
+%.exe.run: %.exe
 	./$<
 	@echo ""
-	@rm -f $<
-
-%.run: %.run.exe
-	@./$<
 
 %.test.exe: %.mc
-	mi compile --test $<
-	@mv $(basename $(notdir $<)) $@
+	mi compile --test --output $@ $<
 
-%.run.exe: %.mc
-	@mi compile $<
-	@mv $(basename $(notdir $<)) $@
+%.exe: %.mc
+	mi compile --output $@ $<
+
+${TOOL_NAME}.exe: $(SRCS)
+
+ast_gen.mc: ast.syn
+	mi syn ast.syn ast_gen.mc
+
+watch:
+	find . "(" -name "*.mc" -o -name "*.syn" ")" -a ! -name "ast_gen.mc" | entr -rc make test
+
+install: build/${TOOL_NAME}
+	cp build/${TOOL_NAME} ${BIN_PATH}
+
+uninstall:
+	rm -f ${BIN_PATH}/${TOOL_NAME}
 
 clean:
-	rm -f **/*.exe
+	rm -rf *.exe build

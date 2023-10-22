@@ -1,0 +1,33 @@
+include GRAPHSIM
+include GRAPHSIMEXPORT
+
+def R = 1.
+def L = 1.
+def C = 1.
+
+def Sections(n3: Node, acc: (Model, Node), n: Int) -> (Model, Node) = {
+  if n < 1 then error "n is not a positive number"
+  else
+    def (sections, n1) = acc;
+    def n2: Node;
+    def acc = (Inductor(L, n1, n2); Capacitor(C, n2, n3); sections, n2);
+    if n == 1 then acc
+    else Sections(n3, acc, n - 1)
+}
+
+def CauerTopology(n: Int) = {
+  def n1, n3: Node;
+  def uIn, uOut: Voltage;
+  def t: Signal;
+  def (sections, n2) = Sections(n3, (VoltageSource(uIn, n1, n3), n1), n);
+  t' = 1.;
+  sections;
+  Capacitor(C,n3,n2);
+  Resistor(R,n3,n2);
+  VoltageSensor(uOut, n3, n2);
+  uIn = 1. / (1. + exp(-t))
+}
+
+def main =
+  //export2ModelicaFile (elaborate (CauerTopology(50)))
+  print (export2peadae (elaborate (CauerTopology(10))) ++ "\n")

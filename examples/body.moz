@@ -1,0 +1,26 @@
+include GRAPHSIMVISUAL
+
+def world, f1: Frame
+def Jd = (1., 1., 1.)
+
+def model = {
+  def om1, om2, om3, T1, T2, T3, q1, q2, q3, q4, t: Real;
+  def om = vec3 om1 om2 om3;
+  def q = quat q1 q2 q3 q4;
+  def T = vec3 T1 T2 T3;
+  def R = mkR q;
+  def J = mkJ Jd;
+  def Jw = R * J * (tr R);
+  relateQtoOm q om;
+  t' = 1.;
+  T = Jw * om' + (ss om) * Jw * om;
+  T = vec3 (sin t) (cos t) 0.;
+  q <~ quat (0.3, 0.3, 0.3, 0.3);
+  probe om1;
+  probe om2;
+  probe om3
+}
+
+//def _ = elaborateToFile "scene.json" (export2ModelicaFileDebug "model.mo" "Model") model
+//def _ = writeFile "model.mc" (export2Daecore (elaborate model) ++ "\n")
+def _ = print (export2peadae (elaborate model) ++ "\n")

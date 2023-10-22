@@ -1,0 +1,44 @@
+include GRAPHSIMVISUAL
+
+def t: Real
+def world, f1: Frame
+
+def m = 1.
+def l = 2.
+def h = 0.3
+
+def revoluteJoint(u: RealVector3, q0: RealQuaternion) -> FrameFun2  = {
+  fun f1: Frame -> fun f2: Frame ->
+    def q = _mkRevoluteJointVar ();
+    f1 -- (RevoluteJoint u q world || SphericalJoint) -- f2;
+    q <~ quat q0
+}
+
+def bar(l: Real, x: SRMatrix, q: SRMatrix) =
+  BarV(world, m, l, h, h, GREEN, 0.7, x, q)
+
+def model = {
+  def x, y, z: Real;
+  def q0_1 = IDQ_R;
+  def q0_2 = eaa2quat(PI / 2., (0., 1., 0.));
+
+  def torque = { fun t: <Real> -> vec3(0., 0., exp(-t) / ((1. + exp(-t)) * (1. + exp(-t)))) };
+
+  def (x1, q1) = _mkBodyVars ();
+  def (_, q2) = _mkBodyVars ();
+
+  world -- (revoluteJoint(ZHAT_R, q0_1) || TorqueActuator(torque(t)))
+        -- bar(l, x1, q1) -- revoluteJoint(XHAT_R, q0_1)
+        -- bar(1.5 * l, vec3 x y z, q2) -- f1;
+
+  Clock(0., t);
+  q1 <~ quat q0_1;
+  q2 <~ quat q0_2;
+  probe x;
+  probe y;
+  probe z
+}
+
+//def _ = elaborateToFile "scene.json" (export2ModelicaFileDebug "model.mo" "Model") model
+//def _ =   export2ModelicaFile (elaborate model)
+def _ = print (export2peadae (elaborate model) ++ "\n")

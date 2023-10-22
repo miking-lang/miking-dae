@@ -1,0 +1,153 @@
+language DAEParse
+
+start DAEProg
+
+type DAEType
+type DAEConst
+type DAEPat
+type DAEExpr {
+  grouping = "(" ")",
+}
+type DAEEqn
+type DAEVar
+type DAETop
+type DAEProg
+
+-- Types
+prod FloatDAEType: DAEType = "Float"
+prod IntDAEType: DAEType = "Int"
+infix right Arrow: DAEType = "->"
+
+-- Constants
+prod Float: DAEConst = val:Float
+prod Int: DAEConst = val:Int
+prod True: DAEConst = "true"
+prod False: DAEConst = "false"
+prod Pred: DAEConst = "pred"
+prod Exp: DAEConst = "exp"
+prod Sin: DAEConst = "sin"
+prod Cos: DAEConst = "cos"
+prod Sqrt: DAEConst = "sqrt"
+
+-- Patterns
+prod TupleDAEPat: DAEPat = "{" (names:LName ("," names:LName)*)? "}"
+
+-- Expressions
+prod Var: DAEExpr = name:LName
+prod Abs: DAEExpr = "lam" name:LName "." body:DAEExpr
+prod left App: DAEExpr = fn:DAEExpr arg:DAEExpr
+prod Tuple: DAEExpr = "{" (exprs:DAEExpr ("," exprs:DAEExpr)*)? "}"
+prod Proj: DAEExpr = expr:DAEExpr "." label:Int
+prod Const: DAEExpr = val:DAEConst
+infix left Add: DAEExpr = "+"
+infix left Sub: DAEExpr = "-"
+infix left Mul: DAEExpr = "*"
+infix left Div: DAEExpr = "/"
+infix left Lt: DAEExpr = "<"
+infix left Ltf: DAEExpr = "<."
+infix left Eq: DAEExpr = "=="
+prefix Neg: DAEExpr = "-."
+prod MatchIn: DAEExpr =
+  "match" target:DAEExpr "with" pat:DAEPat "in" body:DAEExpr
+prod If: DAEExpr =
+  "if" pred:DAEExpr "then" thn:DAEExpr "else" els:DAEExpr
+prod Let: DAEExpr = "let" name:LName "=" arg:DAEExpr "in" body:DAEExpr
+prod RecLet: DAEExpr = "reclet" name:LName "=" arg:DAEExpr "in" body:DAEExpr
+postfix Prim: DAEExpr = "'"
+
+-- Equations
+prod Eqn: DAEEqn = left:DAEExpr "=" right:DAEExpr
+
+-- Variables
+prod VarsDAEVar: DAEVar = names:LName ("," names:LName)* ":" ty:DAEType
+
+-- Top-level
+prod LetDAETop: DAETop = "let" name:LName "=" arg:DAEExpr "end"
+prod RecLetDAETop: DAETop = "reclet" name:LName "=" arg:DAEExpr "end"
+
+-- Program
+prod Prog: DAEProg =
+  (tops:DAETop)*
+  "variables"
+  (vars:DAEVar) (";" vars:DAEVar)*
+  "init"
+  ((ieqns:DAEEqn) (";" ieqns:DAEEqn)*)?
+  "equations"
+  (eqns:DAEEqn) (";" eqns:DAEEqn)*
+  "output"
+  (output:DAEExpr)
+
+-- Precedence Table
+precedence {
+  Proj;
+  Prim;
+  Neg;
+  App;
+  Mul Div;
+  Add Sub;
+  Lt;
+  If;
+  Abs;
+}
+
+-------------------------------------------------------------------
+
+-- Tokens. These will not be covered in the tutorial, but if you're
+-- curious the language fragments defining each of these tokens
+-- can be found here:
+-- https://github.com/miking-lang/miking/blob/develop/stdlib/parser/lexer.mc
+
+include "lib/prime-lexer.mc"
+
+-- Basic tokens
+token String {
+  repr = StringRepr {},
+  constructor = StringTok,
+  fragment = StringTokenParser,
+}
+token Int {
+  repr = IntRepr {},
+  constructor = IntTok,
+  fragment = UIntTokenParser,
+}
+token Float {
+  repr = FloatRepr {},
+  constructor = FloatTok,
+  fragment = UFloatTokenParser,
+}
+token LIdent {
+  repr = LIdentRepr {},
+  constructor = LIdentTok,
+  fragment = LIdentTokenParser,
+  ty = String,
+}
+token UIdent {
+  repr = UIdentRepr {},
+  constructor = UIdentTok,
+  fragment = UIdentTokenParser,
+  ty = String,
+}
+
+-- Wrapping tokens that just change the type in the AST
+token UName {
+  base = UIdent,
+  wrap = nameNoSym,
+  ty = Name,
+}
+token LName {
+  base = LIdent,
+  wrap = nameNoSym,
+  ty = Name,
+}
+
+-- Token types only used through literals
+token {fragment = OperatorTokenParser,}
+token {fragment = CommaTokenParser,}
+token {fragment = SemiTokenParser,}
+token {fragment = BracketTokenParser,}
+token {fragment = PrimeTokenParser,}
+
+-- Whitespace and comments
+token {fragment = LineCommentParser,}
+token {fragment = MultilineCommentParser,}
+token {fragment = WhitespaceParser,}

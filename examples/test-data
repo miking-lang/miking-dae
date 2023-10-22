@@ -1,0 +1,796 @@
+LOG DEBUG:	compiling harmonic.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 2
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 0
+harmonic-numjac.out OK
+LOG DEBUG:	compiling pendulum.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 5
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+pendulum-numjac.out OK
+LOG DEBUG:	compiling lrc.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 10
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 0
+lrc-numjac.out OK
+LOG DEBUG:	compiling body.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 11
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 0
+body-numjac.out OK
+LOG DEBUG:	compiling pendulum_3d.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 41
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+pendulum_3d-numjac.out OK
+LOG DEBUG:	compiling furuta.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 143
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+furuta-numjac.out OK
+LOG DEBUG:	compiling cauer.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 208
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 1
+cauer-numjac.out OK
+LOG DEBUG:	compiling harmonic.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 2
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 0
+harmonic-ad.out OK
+LOG DEBUG:	compiling pendulum.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 5
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+pendulum-ad.out OK
+LOG DEBUG:	compiling lrc.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 10
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 0
+lrc-ad.out OK
+LOG DEBUG:	compiling body.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 11
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 0
+body-ad.out OK
+LOG DEBUG:	compiling pendulum_3d.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 41
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+pendulum_3d-ad.out OK
+LOG DEBUG:	compiling furuta.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 143
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+furuta-ad.out OK
+LOG DEBUG:	compiling cauer.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 208
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 1
+cauer-ad.out OK
+LOG DEBUG:	compiling harmonic.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 2
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 0
+LOG DEBUG:	daeGenMixedJacYp
+2 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+0 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+2 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+0 specialized partial derivatives
+harmonic-0.out OK
+LOG DEBUG:	compiling pendulum.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 5
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+LOG DEBUG:	daeGenMixedJacYp
+6 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+0 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+5 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+0 specialized partial derivatives
+pendulum-0.out OK
+LOG DEBUG:	compiling lrc.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 10
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 0
+LOG DEBUG:	daeGenMixedJacYp
+3 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+0 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+10 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+0 specialized partial derivatives
+lrc-0.out OK
+LOG DEBUG:	compiling body.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 11
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 0
+LOG DEBUG:	daeGenMixedJacYp
+8 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+0 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+11 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+0 specialized partial derivatives
+body-0.out OK
+LOG DEBUG:	compiling pendulum_3d.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 41
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+LOG DEBUG:	daeGenMixedJacYp
+33 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+0 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+42 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+0 specialized partial derivatives
+pendulum_3d-0.out OK
+LOG DEBUG:	compiling furuta.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 143
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+LOG DEBUG:	daeGenMixedJacYp
+98 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+0 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+146 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+0 specialized partial derivatives
+furuta-0.out OK
+LOG DEBUG:	compiling cauer.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 208
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 1
+LOG DEBUG:	daeGenMixedJacYp
+103 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+0 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+206 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+0 specialized partial derivatives
+cauer-0.out OK
+LOG DEBUG:	compiling harmonic.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 2
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 0
+LOG DEBUG:	daeGenMixedJacYp
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+2 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+1 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+1 specialized partial derivatives
+harmonic-1.out OK
+LOG DEBUG:	compiling harmonic.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 2
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 0
+LOG DEBUG:	daeGenMixedJacYp
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+2 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+2 specialized partial derivatives
+harmonic-2.out OK
+LOG DEBUG:	compiling pendulum.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 5
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+LOG DEBUG:	daeGenMixedJacYp
+4 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+2 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+5 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+0 specialized partial derivatives
+pendulum-1.out OK
+LOG DEBUG:	compiling pendulum.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 5
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+LOG DEBUG:	daeGenMixedJacYp
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+6 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+5 specialized partial derivatives
+pendulum-2.out OK
+LOG DEBUG:	compiling pendulum.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 5
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+LOG DEBUG:	daeGenMixedJacYp
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+6 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+5 specialized partial derivatives
+pendulum-3.out OK
+LOG DEBUG:	compiling lrc.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 10
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 0
+LOG DEBUG:	daeGenMixedJacYp
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+3 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+5 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+5 specialized partial derivatives
+lrc-1.out OK
+LOG DEBUG:	compiling lrc.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 10
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 0
+LOG DEBUG:	daeGenMixedJacYp
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+3 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+2 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+8 specialized partial derivatives
+lrc-2.out OK
+LOG DEBUG:	compiling lrc.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 10
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 0
+LOG DEBUG:	daeGenMixedJacYp
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+3 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+1 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+9 specialized partial derivatives
+lrc-3.out OK
+LOG DEBUG:	compiling lrc.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 10
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 0
+LOG DEBUG:	daeGenMixedJacYp
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+3 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+10 specialized partial derivatives
+lrc-4.out OK
+LOG DEBUG:	compiling body.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 11
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 0
+LOG DEBUG:	daeGenMixedJacYp
+3 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+5 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+11 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+0 specialized partial derivatives
+body-1.out OK
+LOG DEBUG:	compiling body.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 11
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 0
+LOG DEBUG:	daeGenMixedJacYp
+3 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+5 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+7 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+4 specialized partial derivatives
+body-2.out OK
+LOG DEBUG:	compiling body.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 11
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 0
+LOG DEBUG:	daeGenMixedJacYp
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+8 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+7 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+4 specialized partial derivatives
+body-3.out OK
+LOG DEBUG:	compiling body.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 11
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 0
+LOG DEBUG:	daeGenMixedJacYp
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+8 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+7 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+4 specialized partial derivatives
+body-4.out OK
+LOG DEBUG:	compiling body.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 11
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 0
+LOG DEBUG:	daeGenMixedJacYp
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+8 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+7 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+4 specialized partial derivatives
+body-5.out OK
+LOG DEBUG:	compiling body.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 11
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 0
+LOG DEBUG:	daeGenMixedJacYp
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+8 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+3 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+8 specialized partial derivatives
+body-6.out OK
+LOG DEBUG:	compiling body.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 11
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 0
+LOG DEBUG:	daeGenMixedJacYp
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+8 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+11 specialized partial derivatives
+body-7.out OK
+LOG DEBUG:	compiling pendulum_3d.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 41
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+LOG DEBUG:	daeGenMixedJacYp
+19 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+14 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+30 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+12 specialized partial derivatives
+pendulum_3d-1.out OK
+LOG DEBUG:	compiling pendulum_3d.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 41
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+LOG DEBUG:	daeGenMixedJacYp
+10 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+23 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+21 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+21 specialized partial derivatives
+pendulum_3d-2.out OK
+LOG DEBUG:	compiling pendulum_3d.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 41
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+LOG DEBUG:	daeGenMixedJacYp
+10 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+23 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+21 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+21 specialized partial derivatives
+pendulum_3d-3.out OK
+LOG DEBUG:	compiling pendulum_3d.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 41
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+LOG DEBUG:	daeGenMixedJacYp
+3 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+30 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+15 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+27 specialized partial derivatives
+pendulum_3d-4.out OK
+LOG DEBUG:	compiling pendulum_3d.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 41
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+LOG DEBUG:	daeGenMixedJacYp
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+33 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+15 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+27 specialized partial derivatives
+pendulum_3d-5.out OK
+LOG DEBUG:	compiling pendulum_3d.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 41
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+LOG DEBUG:	daeGenMixedJacYp
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+33 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+4 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+38 specialized partial derivatives
+pendulum_3d-7.out OK
+LOG DEBUG:	compiling pendulum_3d.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 41
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+LOG DEBUG:	daeGenMixedJacYp
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+33 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+4 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+38 specialized partial derivatives
+pendulum_3d-8.out OK
+LOG DEBUG:	compiling pendulum_3d.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 41
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+LOG DEBUG:	daeGenMixedJacYp
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+33 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+42 specialized partial derivatives
+pendulum_3d-9.out OK
+LOG DEBUG:	compiling furuta.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 143
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+LOG DEBUG:	daeGenMixedJacYp
+61 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+37 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+119 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+27 specialized partial derivatives
+furuta-1.out OK
+LOG DEBUG:	compiling furuta.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 143
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+LOG DEBUG:	daeGenMixedJacYp
+43 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+55 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+88 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+58 specialized partial derivatives
+furuta-2.out OK
+LOG DEBUG:	compiling furuta.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 143
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+LOG DEBUG:	daeGenMixedJacYp
+35 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+63 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+74 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+72 specialized partial derivatives
+furuta-3.out OK
+LOG DEBUG:	compiling furuta.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 143
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+LOG DEBUG:	daeGenMixedJacYp
+15 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+83 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+55 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+91 specialized partial derivatives
+furuta-4.out OK
+LOG DEBUG:	compiling furuta.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 143
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+LOG DEBUG:	daeGenMixedJacYp
+6 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+92 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+49 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+97 specialized partial derivatives
+furuta-5.out OK
+LOG DEBUG:	compiling furuta.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 143
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+LOG DEBUG:	daeGenMixedJacYp
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+98 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+46 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+100 specialized partial derivatives
+furuta-6.out OK
+LOG DEBUG:	compiling furuta.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 143
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+LOG DEBUG:	daeGenMixedJacYp
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+98 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+34 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+112 specialized partial derivatives
+furuta-7.out OK
+LOG DEBUG:	compiling furuta.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 143
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+LOG DEBUG:	daeGenMixedJacYp
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+98 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+15 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+131 specialized partial derivatives
+furuta-8.out OK
+LOG DEBUG:	compiling furuta.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 143
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+LOG DEBUG:	daeGenMixedJacYp
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+98 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+12 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+134 specialized partial derivatives
+furuta-9.out OK
+LOG DEBUG:	compiling furuta.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 143
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 2
+LOG DEBUG:	daeGenMixedJacYp
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+98 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+146 specialized partial derivatives
+furuta-10.out OK
+LOG DEBUG:	compiling cauer.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 208
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 1
+LOG DEBUG:	daeGenMixedJacYp
+3 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+100 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+204 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+2 specialized partial derivatives
+cauer-1.out OK
+LOG DEBUG:	compiling cauer.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 208
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 1
+LOG DEBUG:	daeGenMixedJacYp
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+103 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+206 specialized partial derivatives
+cauer-2.out OK
+rm body-numjac.out pendulum_3d-3.out body-5.out harmonic-ad.out pendulum_3d-1.out furuta-6.out furuta-ad.out furuta-7.out furuta-numjac.out pendulum_3d-7.out cauer-ad.out body-1.out pendulum_3d-8.out furuta-10.out pendulum_3d-2.out lrc-numjac.out furuta-2.out lrc-3.out harmonic-numjac.out pendulum-3.out pendulum_3d-5.out body-ad.out harmonic-1.out furuta-0.out pendulum_3d-0.out furuta-9.out pendulum_3d-numjac.out pendulum-ad.out body-2.out body-0.out body-4.out pendulum-2.out pendulum-1.out furuta-4.out harmonic-2.out pendulum_3d-4.out lrc-0.out pendulum-0.out pendulum_3d-9.out furuta-1.out lrc-1.out body-7.out body-3.out cauer-1.out furuta-5.out cauer-numjac.out lrc-4.out pendulum-numjac.out lrc-2.out harmonic-0.out pendulum_3d-ad.out cauer-2.out lrc-ad.out cauer-0.out furuta-8.out body-6.out furuta-3.out
+LOG DEBUG:	compiling cauer_10.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 48
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 1
+cauer_10-numjac.out OK
+LOG DEBUG:	compiling cauer_100.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 408
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 1
+cauer_100-numjac.out OK
+LOG DEBUG:	compiling cauer_10.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 48
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 1
+cauer_10-ad.out OK
+LOG DEBUG:	compiling cauer_100.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 408
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 1
+cauer_100-ad.out OK
+LOG DEBUG:	compiling cauer_10.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 48
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 1
+LOG DEBUG:	daeGenMixedJacYp
+23 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+0 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+46 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+0 specialized partial derivatives
+cauer_10-0.out OK
+LOG DEBUG:	compiling cauer_100.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 408
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 1
+LOG DEBUG:	daeGenMixedJacYp
+203 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+0 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+406 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+0 specialized partial derivatives
+cauer_100-0.out OK
+LOG DEBUG:	compiling cauer_10.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 48
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 1
+LOG DEBUG:	daeGenMixedJacYp
+3 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+20 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+44 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+2 specialized partial derivatives
+cauer_10-1.out OK
+LOG DEBUG:	compiling cauer_10.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 48
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 1
+LOG DEBUG:	daeGenMixedJacYp
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+23 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+46 specialized partial derivatives
+cauer_10-2.out OK
+LOG DEBUG:	compiling cauer_100.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 408
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 1
+LOG DEBUG:	daeGenMixedJacYp
+3 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+200 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+404 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+2 specialized partial derivatives
+cauer_100-1.out OK
+LOG DEBUG:	compiling cauer_100.dae
+LOG DEBUG:	daeCompile:analysis:
+number of equations: 408
+LOG DEBUG:	daeCompile:analysis:
+max equation offset 1
+LOG DEBUG:	daeGenMixedJacYp
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacYp
+203 specialized partial derivatives
+LOG DEBUG:	daeGenMixedJacY
+0 AD derivatives
+LOG DEBUG:	daeGenMixedJacY
+406 specialized partial derivatives
+cauer_100-2.out OK
+rm cauer_10-1.out cauer_100-numjac.out cauer_10-numjac.out cauer_100-1.out cauer_10-2.out cauer_10-0.out cauer_10-ad.out cauer_100-0.out cauer_100-2.out cauer_100-ad.out
