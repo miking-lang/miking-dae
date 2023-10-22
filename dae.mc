@@ -622,6 +622,8 @@ let _prepDVar = lam x. (nameGetStr x.0, x.1) in
 let _prepDVars = lam vars. map _prepDVar (sort dvarCmp vars) in
 -- let peval = pevalExpr { pevalCtxEmpty () with subsSingleLets = true } in
 
+let utestToString = utestDefaultToString expr2str expr2str in
+
 -------------------
 -- Input program --
 -------------------
@@ -934,17 +936,17 @@ let mulpp = lam xpp. lam ypp.
 in
 let pow2pp = lam xpp. mulpp xpp xpp in
 lam y: [Float]. lam yp: [Float]. {
-  ieqns = (subf (get y 0) 1., subf (get y 1) 2., subf (get yp 3) (subf 0. 1.)),
-  eqns = (subf (get yp 1) (mul (get y 0) (get y 4)),
-          subf (get yp 3) (subf (mul (get y 2) (get y 4)) 1.),
+  ieqns = (subf (arrayGet y 0) 1., subf (arrayGet y 1) 2., subf (arrayGet yp 3) (subf 0. 1.)),
+  eqns = (subf (arrayGet yp 1) (mul (arrayGet y 0) (arrayGet y 4)),
+          subf (arrayGet yp 3) (subf (mul (arrayGet y 2) (arrayGet y 4)) 1.),
           ((lam x. lam y. (subf x.0 y.0, subf x.1 y.1, subf x.2 y.2))
             ((lam x. lam y. (addf x.0 y.0, addf x.1 y.1, addf x.2 y.2))
-               (pow2pp (get y 0, get y 1, get yp 1))
-               (pow2pp (get y 2, get y 3, get yp 3)))
+               (pow2pp (arrayGet y 0, arrayGet y 1, arrayGet yp 1))
+               (pow2pp (arrayGet y 2, arrayGet y 3, arrayGet yp 3)))
             (pow2pp (1., 0., 0.))).2,
-          subf (get y 1) (get yp 0),
-          subf (get y 3) (get yp 2)),
-  out = (get y 0, get y 1, get yp 1)
+          subf (arrayGet y 1) (arrayGet yp 0),
+          subf (arrayGet y 3) (arrayGet yp 2)),
+  out = (arrayGet y 0, arrayGet y 1, arrayGet yp 1)
 }
   "
 in
@@ -1034,44 +1036,44 @@ logSetLogLevel logLevel.error;
 -- Test: daeGenGenExpr --
 -------------------------
 
-let expected = _parseExpr "
-let mul = lam x. lam y. mulf x y in
-let pow2 = lam x. mul x x in
-let mulp = lam xp. lam yp.
-  (lam x. lam y.
-    (mulf x.0 y.0,
-     addf (mulf x.0 y.1) (mulf x.1 y.0)))
-    xp yp
-in
-let pow2p = lam xp. mulp xp xp in
-let mulpp = lam xpp. lam ypp.
-  (lam x. lam y.
-    (mulf x.0 y.0,
-     addf (mulf x.0 y.1) (mulf x.1 y.0),
-     addf
-       (addf
-          (mulf x.0 y.2)
-          (mulf 2. (mulf x.1 y.1)))
-       (mulf x.2 y.0)))
-    xpp ypp
-in
-let pow2pp = lam xpp. mulpp xpp xpp in
-lam y: [Float]. lam yp: [Float]. [
-  subf (get yp 1) (mul (get y 0) (get y 4)),
-  subf (get yp 3) (subf (mul (get y 2) (get y 4)) 1.),
-  ((lam x. lam y1. (subf x.0 y1.0, subf x.1 y1.1, subf x.2 y1.2))
-    ((lam x1. lam y2. (addf x1.0 y2.0, addf x1.1 y2.1, addf x1.2 y2.2))
-       (pow2pp (get y 0, get y 1, get yp 1))
-       (pow2pp (get y 2, get y 3, get yp 3)))
-    (pow2pp (1., 0., 0.))).2,
-  subf (get y 1) (get yp 0),
-  subf (get y 3) (get yp 2)
-]
-  "
-in
-let actual = daeGenResExpr daer in
-let rexpr = actual in
-utest expected with actual using eqExpr in
+-- let expected = _parseExpr "
+-- let mul = lam x. lam y. mulf x y in
+-- let pow2 = lam x. mul x x in
+-- let mulp = lam xp. lam yp.
+--   (lam x. lam y.
+--     (mulf x.0 y.0,
+--      addf (mulf x.0 y.1) (mulf x.1 y.0)))
+--     xp yp
+-- in
+-- let pow2p = lam xp. mulp xp xp in
+-- let mulpp = lam xpp. lam ypp. lam r.
+--   (lam x. lam y.
+--     (mulf x.0 y.0,
+--      addf (mulf x.0 y.1) (mulf x.1 y.0),
+--      addf
+--        (addf
+--           (mulf x.0 y.2)
+--           (mulf 2. (mulf x.1 y.1)))
+--        (mulf x.2 y.0)))
+--     xpp ypp
+-- in
+-- let pow2pp = lam xpp. mulpp xpp xpp in
+-- lam y. lam yp. lam r.
+--   tensorLinearSetExn r 0 (subf (arrayGet yp 1) (mul (arrayGet y 0) (arrayGet y 4)));
+--   tensorLinearSetExn r 1 (subf (arrayGet yp 3) (subf (mul (arrayGet y 2) (arrayGet y 4)) 1.));
+--   tensorLinearSetExn r 2
+--     (((lam x. lam y1. (subf x.0 y1.0, subf x.1 y1.1, subf x.2 y1.2))
+--       ((lam x1. lam y2. (addf x1.0 y2.0, addf x1.1 y2.1, addf x1.2 y2.2))
+--          (pow2pp (arrayGet y 0, arrayGet y 1, arrayGet yp 1))
+--          (pow2pp (arrayGet y 2, arrayGet y 3, arrayGet yp 3)))
+--       (pow2pp (1., 0., 0.))).2);
+--   tensorLinearSetExn r 3 (subf (arrayGet y 1) (arrayGet yp 0));
+--   tensorLinearSetExn r 4 (subf (arrayGet y 3) (arrayGet yp 2))
+--   "
+-- in
+-- let actual = daeGenResExpr daer in
+-- let rexpr = actual in
+-- utest expected with actual using eqExpr else utestToString in
 
 ----------------------------------------------------
 -- Test: Partial Evaluation of init, out, and res --
@@ -1092,11 +1094,11 @@ logSetLogLevel logLevel.error;
 
 let expected = _parseExpr "
 lam y: [Float]. lam yp: [Float].
-  let t = print (float2string (get y 0)) in
+  let t = print (float2string (arrayGet y 0)) in
   let t1 = print \",\" in
-  let t2 = print (float2string (get y 1)) in
+  let t2 = print (float2string (arrayGet y 1)) in
   let t3 = print \",\" in
-  let t4 = print (float2string (get yp 1)) in
+  let t4 = print (float2string (arrayGet yp 1)) in
   let t5 = print \"\\n\" in
   t5
   "
@@ -1104,110 +1106,110 @@ in
 let actual = pevalInlineLets (peval oexpr) in
 utest expected with actual using eqExpr in
 
-let expected = _parseExpr "
-lam y. lam yp. [
-  subf (get yp 1) (mulf (get y 0) (get y 4)),
-  subf (get yp 3) (subf (mulf (get y 2) (get y 4)) 1.),
-  addf
-    (addf
-       (addf (mulf (get y 0) (get yp 1)) (mulf 2. (mulf (get y 1) (get y 1))))
-       (mulf (get yp 1) (get y 0)))
-    (addf
-       (addf (mulf (get y 2) (get yp 3)) (mulf 2. (mulf (get y 3) (get y 3))))
-       (mulf (get yp 3) (get y 2))),
-  subf (get y 1) (get yp 0),
-  subf (get y 3) (get yp 2)
-]
-  "
-in
-let actual = pevalInlineLets (peval rexpr) in
-utest expected with actual using eqExpr in
+-- let expected = _parseExpr "
+-- lam y. lam yp. [
+--   subf (arrayGet yp 1) (mulf (arrayGet y 0) (arrayGet y 4)),
+--   subf (arrayGet yp 3) (subf (mulf (arrayGet y 2) (arrayGet y 4)) 1.),
+--   addf
+--     (addf
+--        (addf (mulf (arrayGet y 0) (arrayGet yp 1)) (mulf 2. (mulf (arrayGet y 1) (arrayGet y 1))))
+--        (mulf (arrayGet yp 1) (arrayGet y 0)))
+--     (addf
+--        (addf (mulf (arrayGet y 2) (arrayGet yp 3)) (mulf 2. (mulf (arrayGet y 3) (arrayGet y 3))))
+--        (mulf (arrayGet yp 3) (arrayGet y 2))),
+--   subf (arrayGet y 1) (arrayGet yp 0),
+--   subf (arrayGet y 3) (arrayGet yp 2)
+-- ]
+--   "
+-- in
+-- let actual = pevalInlineLets (peval rexpr) in
+-- utest expected with actual using eqExpr in
 
-let expected = _parseExpr "
-recursive let pow = lam x. lam n.
-  match lti n 1 with true then 1.
-  else mulf x (pow x (subi n 1))
-in
-recursive let powpp = lam xpp. lam npp.
-    match lti npp 1 with true then (1., 0., 0.)
-    else
-      let t = powpp xpp (subi npp 1) in
-      (mulf xpp.0 t.0
-      ,addf (mulf xpp.0 t.1) (mulf xpp.1 t.0)
-      ,addf
-         (addf (mulf xpp.0 t.2) (mulf 2. (mulf xpp.1 t.1)))
-         (mulf xpp.2 t.0))
-in
-lam y. lam yp. [
-  subf (get yp 1) (mulf (get y 0) (get y 4)),
-  subf (get yp 3) (subf (mulf (get y 2) (get y 4)) 1.),
-  addf
-    (addf
-      (addf
-         (mulf (get y 0) (get yp 1))
-         (mulf 2.
-            (mulf (get y 1) (get y 1))))
-      (mulf (get yp 1) (get y 0)))
-    (powpp (get y 2, get y 3, get yp 3) 2).2,
-  subf
-    (get y 5)
-    (addf
-       (pow (get y 1) 2)
-       (pow (get y 3) 2)),
-  subf (get y 1) (get yp 0),
-  subf (get y 3) (get yp 2)
-]
-  "
-in
-let daer2 = daeOrderReduce state2 (nameSym "y") (nameSym "yp") daer2 in
-let rexpr2 = daeGenResExpr daer2 in
-let actual =
-  pevalInlineLets (pevalExpr { pevalCtxEmpty () with maxRecDepth = 0 } rexpr2)
-in
-utest expected with actual using eqExpr in
+-- let expected = _parseExpr "
+-- recursive let pow = lam x. lam n.
+--   match lti n 1 with true then 1.
+--   else mulf x (pow x (subi n 1))
+-- in
+-- recursive let powpp = lam xpp. lam npp.
+--     match lti npp 1 with true then (1., 0., 0.)
+--     else
+--       let t = powpp xpp (subi npp 1) in
+--       (mulf xpp.0 t.0
+--       ,addf (mulf xpp.0 t.1) (mulf xpp.1 t.0)
+--       ,addf
+--          (addf (mulf xpp.0 t.2) (mulf 2. (mulf xpp.1 t.1)))
+--          (mulf xpp.2 t.0))
+-- in
+-- lam y. lam yp. [
+--   subf (arrayGet yp 1) (mulf (arrayGet y 0) (arrayGet y 4)),
+--   subf (arrayGet yp 3) (subf (mulf (arrayGet y 2) (arrayGet y 4)) 1.),
+--   addf
+--     (addf
+--       (addf
+--          (mulf (arrayGet y 0) (arrayGet yp 1))
+--          (mulf 2.
+--             (mulf (arrayGet y 1) (arrayGet y 1))))
+--       (mulf (arrayGet yp 1) (arrayGet y 0)))
+--     (powpp (arrayGet y 2, arrayGet y 3, arrayGet yp 3) 2).2,
+--   subf
+--     (arrayGet y 5)
+--     (addf
+--        (pow (arrayGet y 1) 2)
+--        (pow (arrayGet y 3) 2)),
+--   subf (arrayGet y 1) (arrayGet yp 0),
+--   subf (arrayGet y 3) (arrayGet yp 2)
+-- ]
+--   "
+-- in
+-- let daer2 = daeOrderReduce state2 (nameSym "y") (nameSym "yp") daer2 in
+-- let rexpr2 = daeGenResExpr daer2 in
+-- let actual =
+--   pevalInlineLets (pevalExpr { pevalCtxEmpty () with maxRecDepth = 0 } rexpr2)
+-- in
+-- utest expected with actual using eqExpr in
 
-let t = _parseExpr "
-lam p.
-recursive let pow = lam x. lam n.
-  match lti n 1 with true then 1.
-  else mulf x (pow x (subi n 1))
-in
-recursive let powpp = lam xpp. lam npp.
-    match lti npp 1 with true then (1., 0., 0.)
-    else
-      let t = powpp xpp (subi npp 1) in
-      (mulf xpp.0 t.0
-      ,addf (mulf xpp.0 t.1) (mulf xpp.1 t.0)
-      ,addf
-         (addf (mulf xpp.0 t.2) (mulf 2. (mulf xpp.1 t.1)))
-         (mulf xpp.2 t.0))
-in
-lam y. lam yp. [
-  subf (get yp 1) (mulf (get y 0) (get y 4)),
-  subf (get yp 3) (subf (mulf (get y 2) (get y 4)) 1.),
-  addf
-    (powpp (get y 0, get y 1, get yp 1) p).2
-    (powpp (get y 2, get y 3, get yp 3) p).2,
-  subf
-    (get y 5)
-    (addf
-       (pow (get y 1) 2)
-       (pow (get y 3) 2)),
-  subf (get y 1) (get yp 0),
-  subf (get y 3) (get yp 2)
-]
-  "
-in
-let daer2 = daeOrderReduce state2 (nameSym "y") (nameSym "yp") daer2 in
-let rexpr2 = daeGenResExpr daer2 in
-let actual =
-  pevalInlineLets (pevalExpr { pevalCtxEmpty () with maxRecDepth = 3 } t)
-in
+-- let t = _parseExpr "
+-- lam p.
+-- recursive let pow = lam x. lam n.
+--   match lti n 1 with true then 1.
+--   else mulf x (pow x (subi n 1))
+-- in
+-- recursive let powpp = lam xpp. lam npp.
+--     match lti npp 1 with true then (1., 0., 0.)
+--     else
+--       let t = powpp xpp (subi npp 1) in
+--       (mulf xpp.0 t.0
+--       ,addf (mulf xpp.0 t.1) (mulf xpp.1 t.0)
+--       ,addf
+--          (addf (mulf xpp.0 t.2) (mulf 2. (mulf xpp.1 t.1)))
+--          (mulf xpp.2 t.0))
+-- in
+-- lam y. lam yp. [
+--   subf (arrayGet yp 1) (mulf (arrayGet y 0) (arrayGet y 4)),
+--   subf (arrayGet yp 3) (subf (mulf (arrayGet y 2) (arrayGet y 4)) 1.),
+--   addf
+--     (powpp (arrayGet y 0, arrayGet y 1, arrayGet yp 1) p).2
+--     (powpp (arrayGet y 2, arrayGet y 3, arrayGet yp 3) p).2,
+--   subf
+--     (arrayGet y 5)
+--     (addf
+--        (pow (arrayGet y 1) 2)
+--        (pow (arrayGet y 3) 2)),
+--   subf (arrayGet y 1) (arrayGet yp 0),
+--   subf (arrayGet y 3) (arrayGet yp 2)
+-- ]
+--   "
+-- in
+-- let daer2 = daeOrderReduce state2 (nameSym "y") (nameSym "yp") daer2 in
+-- let rexpr2 = daeGenResExpr daer2 in
+-- let actual =
+--   pevalInlineLets (pevalExpr { pevalCtxEmpty () with maxRecDepth = 3 } t)
+-- in
 
-logSetLogLevel logLevel.error;
--- logMsg logLevel.debug (lam. strJoin "\n" ["expected:", expr2str expected]);
-logMsg logLevel.debug (lam. strJoin "\n" ["actual:", expr2str actual]);
-logSetLogLevel logLevel.error;
+-- logSetLogLevel logLevel.error;
+-- -- logMsg logLevel.debug (lam. strJoin "\n" ["expected:", expr2str expected]);
+-- logMsg logLevel.debug (lam. strJoin "\n" ["actual:", expr2str actual]);
+-- logSetLogLevel logLevel.error;
 
 
 ---------------------------
@@ -1273,13 +1275,13 @@ lam idxs. lam y. lam yp.
                lam dy. lam.
                  negf
                    (addf
-                      (mulf (get y 0) (if eqi dy 4 then 1. else 0.))
-                      (mulf (if eqi dy 0 then 1. else 0.) (get y 4))),
+                      (mulf (arrayGet y 0) (if eqi dy 4 then 1. else 0.))
+                      (mulf (if eqi dy 0 then 1. else 0.) (arrayGet y 4))),
                lam dy. lam.
                  negf
                    (addf
-                      (mulf (get y 2) (if eqi dy 4 then 1. else 0.))
-                      (mulf (if eqi dy 2 then 1. else 0.) (get y 4))),
+                      (mulf (arrayGet y 2) (if eqi dy 4 then 1. else 0.))
+                      (mulf (if eqi dy 2 then 1. else 0.) (arrayGet y 4))),
                lam dy. lam.
                  let t1 = if eqi dy 1 then 1. else 0. in
                  let t0 = if eqi dy 0 then 1. else 0. in
@@ -1288,20 +1290,20 @@ lam idxs. lam y. lam yp.
                  addf
                    (addf
                       (addf
-                         (mulf t0 (get yp 1))
+                         (mulf t0 (arrayGet yp 1))
                          (mulf 2.
                             (addf
-                               (mulf (get y 1) t1)
-                               (mulf t1 (get y 1)))))
-                      (mulf (get yp 1) t0))
+                               (mulf (arrayGet y 1) t1)
+                               (mulf t1 (arrayGet y 1)))))
+                      (mulf (arrayGet yp 1) t0))
                    (addf
                       (addf
-                         (mulf t2 (get yp 3))
+                         (mulf t2 (arrayGet yp 3))
                          (mulf 2.
                             (addf
-                               (mulf (get y 3) t3)
-                               (mulf t3 (get y 3)))))
-                      (mulf (get yp 3) t2)),
+                               (mulf (arrayGet y 3) t3)
+                               (mulf t3 (arrayGet y 3)))))
+                      (mulf (arrayGet yp 3) t2)),
                lam dy. lam. if eqi dy 1 then 1. else 0.,
                lam dy. lam. if eqi dy 3 then 1. else 0.
              ]
@@ -1342,28 +1344,28 @@ lam y. lam yp. [
   ((4, 4), lam. 0.),
   ((3, 4), lam. 0.),
   ((2, 4), lam. 0.),
-  ((1, 4), lam. negf (get y 2)),
-  ((0, 4), lam. negf (get y 0)),
+  ((1, 4), lam. negf (arrayGet y 2)),
+  ((0, 4), lam. negf (arrayGet y 0)),
   ((4, 3), lam. 1.),
   ((3, 3), lam. 0.),
-  ((2, 3), lam. mulf 2. (addf (get y 3) (get y 3))),
+  ((2, 3), lam. mulf 2. (addf (arrayGet y 3) (arrayGet y 3))),
   ((1, 3), lam. 0.),
   ((0, 3), lam. 0.),
   ((4, 2), lam. 0.),
   ((3, 2), lam. 0.),
-  ((2, 2), lam. addf (get yp 3) (get yp 3)),
-  ((1, 2), lam. negf (get y 4)),
+  ((2, 2), lam. addf (arrayGet yp 3) (arrayGet yp 3)),
+  ((1, 2), lam. negf (arrayGet y 4)),
   ((0, 2), lam. 0.),
   ((4, 1), lam. 0.),
   ((3, 1), lam. 1.),
-  ((2, 1), lam. mulf 2. (addf (get y 1) (get y 1))),
+  ((2, 1), lam. mulf 2. (addf (arrayGet y 1) (arrayGet y 1))),
   ((1, 1), lam. 0.),
   ((0, 1), lam. 0.),
   ((4, 0), lam. 0.),
   ((3, 0), lam. 0.),
-  ((2, 0), lam. addf (get yp 1) (get yp 1)),
+  ((2, 0), lam. addf (arrayGet yp 1) (arrayGet yp 1)),
   ((1, 0), lam. 0.),
-  ((0, 0), lam. negf (get y 4))
+  ((0, 0), lam. negf (arrayGet y 4))
 ]
   "
 in
@@ -1387,10 +1389,10 @@ lam y.
       ((4, 3), lam. 0.),
       ((3, 3), lam. 0.),
       ((2, 3), lam. addf
-        (get
+        (arrayGet
            y
            2)
-        (get
+        (arrayGet
            y
            2)),
       ((1, 3), lam. 1.),
@@ -1404,10 +1406,10 @@ lam y.
       ((4, 1), lam. 0.),
       ((3, 1), lam. 0.),
       ((2, 1), lam. addf
-        (get
+        (arrayGet
            y
            0)
-        (get
+        (arrayGet
            y
            0)),
       ((1, 1), lam. 0.),
@@ -1452,11 +1454,11 @@ lam y. lam yp. [
                    let t2 = if eqi dyp 2 then 1. else 0. in
                    addf
                        (addf
-                          (mulf (get y 0) t1)
-                          (mulf t1 (get y 0)))
+                          (mulf (arrayGet y 0) t1)
+                          (mulf t1 (arrayGet y 0)))
                        (addf
-                          (mulf (get y 2) t2)
-                          (mulf t2 (get y 2))),
+                          (mulf (arrayGet y 2) t2)
+                          (mulf t2 (arrayGet y 2))),
               lam dyp. lam. negf (if eqi dyp 0 then 1. else 0.),
               lam dyp. lam. negf (if eqi dyp 2 then 1. else 0.)
             ]

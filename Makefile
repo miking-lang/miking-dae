@@ -1,7 +1,7 @@
 TOOL_NAME=peadae
 BIN_PATH=${HOME}/.local/bin
 
-SRCS := $(shell find . -name "*.mc" -a ! -name "peadae.mc" -a ! -name "ast_gen.mc" -a ! -wholename "./examples/*")
+SRCS := $(shell find . -name "*.mc" -a ! -name "peadae.mc" -a ! -name "ast_gen.mc" -a ! -wholename "./examples/*" ! -wholename "./legacy/*")
 TESTS := $(SRCS:.mc=.test)
 TESTBINS := $(SRCS:.mc=.test.exe.run)
 
