@@ -328,7 +328,7 @@ lang DAEAst = DAEParseAst + AstResult +
       mapAccumL
         (lam env. lam v.
           match v with (id, ty) in
-          let ty = resolveType r.info env.tyConEnv ty in
+          let ty = resolveType r.info env false ty in
           (_insertVar id ty env, (id, ty)))
         env
         r.vars
@@ -350,7 +350,7 @@ lang DAEAst = DAEParseAst + AstResult +
   -- | TmConst {val = CArray _, info = info} ->
   --   TyTensor {info = info, ty = TyFloat {info = info}}
 
-  sem tyConst =
+  sem tyConstBase =
   | CSin _ | CCos _ | CSqrt _ | CExp _ -> tyarrows_ [tyfloat_, tyfloat_]
   | CArrayGet _ ->
     tyalls_ ["a", "b"] (tyarrows_ [tyvar_ "a", tyint_, tyvar_ "b"])
@@ -379,7 +379,7 @@ lang DAEAst = DAEParseAst + AstResult +
   -- Parse
   sem parseDAEExprExn : String -> Expr
   sem parseDAEExprExn =| str ->
-    let t = parseMExprString {
+    let t = parseMExprStringExn {
       keywords = _daeAstKeywords,
       allowFree = true,
       builtin = concat builtin (daeBuiltin ())
