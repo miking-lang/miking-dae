@@ -1,7 +1,7 @@
 TOOL_NAME=peadae
 BIN_PATH=${HOME}/.local/bin
 
-SRCS := $(shell find . -name "*.mc" -a ! -name "peadae.mc" -a ! -name "ast_gen.mc" -a ! -wholename "./examples/*" ! -wholename "./legacy/*")
+SRCS := $(shell find . -name "*.mc" -a ! -name "peadae.mc" -a ! -name "ast_gen.mc" -a ! -wholename "./examples/*" ! -wholename "./legacy/*" ! -wholename "./.git/*")
 TESTS := $(SRCS:.mc=.test)
 TESTBINS := $(SRCS:.mc=.test.exe.run)
 
@@ -13,10 +13,12 @@ build/${TOOL_NAME}: ${TOOL_NAME}.exe
 	mkdir -p build
 	mv ${TOOL_NAME}.exe build/${TOOL_NAME}
 
+test: export PEADAE=$(shell pwd)
 test: $(TESTS)
 
 test-compiled: $(TESTBINS)
 
+test-examples: export PEADAE=$(shell pwd)
 test-examples:
 	$(MAKE) test -C examples
 
@@ -52,3 +54,6 @@ uninstall:
 
 clean:
 	rm -rf *.exe build
+
+clean-examples:
+	$(MAKE) clean -C examples
