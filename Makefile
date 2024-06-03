@@ -52,7 +52,7 @@ install: build/${TOOL_NAME}
 uninstall:
 	rm -f ${BIN_PATH}/${TOOL_NAME}
 
-clean:
+clean: clean-examples
 	rm -rf *.exe build
 
 clean-examples:
